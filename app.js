@@ -430,55 +430,178 @@ function folhaSessao(id){
 }
 
 /* ================= ALUNO · Evolução ================= */
+const ton = kg => kg >= 1000 ? `${fmt(kg/1000,1)} t` : `${fmt(kg,0)} kg`;
+const pct = (a, b) => b ? Math.round((a/b - 1)*100) : 0;
+const sinal = n => n > 0 ? `+${n}` : `${n}`;
+const MES_C = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+
+/* linha pequena, sem eixo (pra caber ao lado do nome) */
+function mini(ys, w = 96, h = 32){
+  if (ys.length < 2) return "";
+  const mn = Math.min(...ys), mx = Math.max(...ys), r = (mx - mn) || 1;
+  const X = i => 3 + (w - 6)*i/(ys.length - 1), Y = v => h - 4 - (h - 8)*(v - mn)/r;
+  return `<svg class="mini-g" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" aria-hidden="true"><path d="${ys.map((v,i) => (i ? "L" : "M") + X(i).toFixed(1) + "," + Y(v).toFixed(1)).join("")}"/><circle cx="${X(ys.length-1).toFixed(1)}" cy="${Y(ys[ys.length-1]).toFixed(1)}" r="3"/></svg>`;
+}
+/* barras por semana (a semana atual fica mais clara: ainda não acabou) */
+function barras(sem){
+  const W = 320, H = 150, pt = 18, pb = 22, n = sem.length, gap = 5, bw = (W - gap*(n - 1))/n;
+  const mx = Math.max(...sem.map(s => s.vol), 1);
+  return `<svg class="graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Volume por semana">${sem.map((s,i) => {
+    const h = (H - pt - pb)*s.vol/mx, x = i*(bw + gap), y = H - pb - h;
+    return `<rect class="barra${s.w === 0 ? " atual" : ""}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(h, s.vol ? 2 : 0).toFixed(1)}" rx="3"/>`
+      + (s.vol === mx || s.w === 0 ? `<text class="val" x="${(x + bw/2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle">${fmt(s.vol/1000,1)}</text>` : "")
+      + (i % 3 === 2 || i === 0 ? `<text x="${(x + bw/2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${ddmm(s.ini)}</text>` : "");
+  }).join("")}</svg>`;
+}
+function semanasDe(ss, n = 12){
+  const ini = inicioSemana();
+  return Array.from({length:n}, (_, i) => {
+    const w = n - 1 - i, a = addDias(ini, -7*w), b = addDias(a, 7);
+    const x = ss.filter(s => { const d = deIso(s.data); return d >= a && d < b; });
+    return {w, ini:a, ses:x, n:x.length, vol:x.reduce((m,s) => m + s.volume, 0), min:x.reduce((m,s) => m + s.dur, 0)};
+  });
+}
+/* melhor carga de um exercício em cada sessão em que ele apareceu */
+function historicoEx(ss, exId){
+  return ss.map(s => { const k = s.series.filter(z => z.ex === exId && z.kg != null); return k.length ? {s, kg:Math.max(...k.map(z => z.kg)), series:s.series.filter(z => z.ex === exId)} : null; }).filter(Boolean);
+}
+
 function vEvolucao(){
-  const s = segAtual("evo","peso");
-  let html = segm("evo", [["peso","Corpo"],["cargas","Cargas"],["freq","Frequência"],["fotos","Fotos"]]);
-  const cs = checkinsDe(EU);
-  if (s === "peso"){
-    const pts = cs.filter(c => c.peso).map(c => ({x:ddmm(deIso(c.data)), y:c.peso}));
-    const cin = cs.filter(c => c.cintura).map(c => ({x:ddmm(deIso(c.data)), y:c.cintura}));
-    const dp = pts.length > 1 ? pts[pts.length-1].y - pts[0].y : 0, dc = cin.length > 1 ? cin[cin.length-1].y - cin[0].y : 0;
-    html += `<div class="card"><span class="eyebrow">Peso</span>
-      <div class="big"><b>${fmt(pts.length ? pts[pts.length-1].y : null)} kg</b>${pts.length > 1 ? `<span class="delta ${dp <= 0 ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde ${pts[0].x}</span>` : ""}</div>
-      ${grafico(pts, {unid:""})}</div>
-      <div class="card"><span class="eyebrow">Cintura</span>
-      <div class="big"><b>${fmt(cin.length ? cin[cin.length-1].y : null)} cm</b>${cin.length > 1 ? `<span class="delta ${dc <= 0 ? "ok" : "bad"}">${dc > 0 ? "+" : ""}${fmt(dc)} cm</span>` : ""}</div>
-      ${grafico(cin, {h:120})}</div>
-      <p class="small muted">Os números vêm dos seus check-ins semanais. Peso caindo devagar com a carga subindo é o melhor cenário: perde gordura sem perder músculo.</p>`;
-  } else if (s === "cargas"){
-    const ids = [...new Set(sessoesDe(EU).flatMap(x => x.series.filter(z => z.kg != null).map(z => z.ex)))];
-    const sel = ids.includes(sub.exEvo) ? sub.exEvo : ids[0];
-    const pts = sessoesDe(EU).map(x => { const k = x.series.filter(z => z.ex === sel && z.kg != null).map(z => z.kg); return k.length ? {x:ddmm(deIso(x.data)), y:Math.max(...k)} : null; }).filter(Boolean);
-    const d = pts.length > 1 ? pts[pts.length-1].y - pts[0].y : 0;
-    html += `<div class="chips scroll">${ids.map(i => `<button type="button" class="chip" data-a="exEvo" data-id="${i}" aria-pressed="${i === sel}">${esc(ex(i).nome.replace(/ com .*| na .*| no .*/,""))}</button>`).join("")}</div>
-      <div class="card"><span class="eyebrow">${esc(ex(sel).nome)} · melhor série</span>
-      <div class="big"><b>${fmt(pts.length ? pts[pts.length-1].y : null)} kg</b>${d ? `<span class="delta ok">+${fmt(d)} kg (${fmt(d/pts[0].y*100,0)}%)</span>` : ""}</div>
-      ${grafico(pts, {casas:1})}</div>
-      <div class="card row flat"><span class="ic acc">🏆</span><span class="grow"><b>${S.sessoes.filter(x => x.aluno === EU).reduce((m,x) => m + x.prs.length, 0)} recordes</b><br><span class="small muted">batidos nas últimas 12 semanas</span></span></div>`;
-  } else if (s === "freq"){
-    const h = hoje0(), ini = addDias(inicioSemana(), -77), dias = new Set(sessoesDe(EU).map(x => x.data));
-    let cols = "";
-    for (let w = 0; w < 12; w++){
-      let c = "";
-      for (let d = 0; d < 7; d++){ const dd = addDias(ini, w*7 + d); c += `<i class="${dd > h ? "fut" : dias.has(iso(dd)) ? "on" : ""}" title="${ddmm(dd)}"></i>`; }
-      cols += `<div class="col">${c}</div>`;
-    }
-    const m30 = sessoesDe(EU).filter(x => diasDesde(x.data) < 30).length;
-    html += `<div class="card"><div class="row sb"><span class="eyebrow">Últimas 12 semanas</span><span class="tiny muted">seg → dom</span></div><div class="heat">${cols}</div></div>
-      <div class="kpis"><div class="kpi"><b>${m30}</b><span>treinos em 30 dias</span></div><div class="kpi"><b>${fmt(m30/30*7,1)}</b><span>treinos por semana</span></div>
-      <div class="kpi"><b>${sequenciaSemanas(EU)}</b><span>semanas seguidas na meta</span></div><div class="kpi"><b>${Math.round(aderencia(EU)*100)}%</b><span>aderência ao plano</span></div></div>`;
-  } else {
-    const silh = `<svg viewBox="0 0 40 80"><circle cx="20" cy="9" r="7"/><path d="M9 20h22l-2 26h-4l-1 30h-8l-1-30h-4z"/></svg>`;
-    html += `<p class="small muted">Fotos ficam só entre você e o ${esc(MARCA.curto)}, nunca públicas. Mesma luz, mesmo lugar, mesma roupa: a comparação fica justa.</p>
-      <div class="fotos">
-        <div class="foto">${silh}<span>Fev · início</span></div>
-        <div class="foto">${silh}<span>Jun</span></div>
-        ${S.fotos.map((f,i) => `<div class="foto" style="background-image:url(${f.src})"><span>${esc(f.rot)}</span></div>`).join("")}
-        <label class="foto add"><b>+</b>Nova foto<input type="file" accept="image/*" data-in="foto" hidden></label>
-      </div>
-      <div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`;
-  }
+  const s = segAtual("evo","desemp");
+  let html = segm("evo", [["desemp","Desempenho"],["cargas","Cargas"],["freq","Frequência"],["fotos","Fotos"]]);
+  const ss = sessoesDe(EU);
+  html += s === "desemp" ? evoDesempenho(ss) : s === "cargas" ? evoCargas(ss) : s === "freq" ? evoFreq(ss) : evoFotos();
   return {sub:"Seu progresso", tit:"Evolução", html};
+}
+
+function evoDesempenho(ss){
+  const sem = semanasDe(ss);
+  const ult4 = sem.slice(7, 11).reduce((m,s) => m + s.vol, 0), ant4 = sem.slice(3, 7).reduce((m,s) => m + s.vol, 0);
+  const dv = pct(ult4, ant4);
+  const m30 = ss.filter(x => diasDesde(x.data) < 30);
+  const prs30 = m30.reduce((m,x) => m + x.prs.length, 0);
+  const rpe = m30.length ? m30.reduce((m,x) => m + x.rpe, 0)/m30.length : 0;
+  const horas = m30.reduce((m,x) => m + x.dur, 0)/60;
+  /* força: quanto a melhor carga de cada exercício subiu do começo até agora */
+  const evol = [...new Set(ss.flatMap(x => x.series.filter(z => z.kg != null).map(z => z.ex)))].map(id => {
+    const h = historicoEx(ss, id); if (h.length < 2) return null;
+    return {id, de:h[0].kg, para:h[h.length-1].kg, p:pct(h[h.length-1].kg, h[0].kg)};
+  }).filter(Boolean).sort((a,b) => b.p - a.p);
+  const forca = evol.length ? Math.round(evol.reduce((m,e) => m + e.p, 0)/evol.length) : 0;
+  const semAtual = sem[11], meta = aluno(EU).meta;
+  const cs = checkinsDe(EU);
+  const pts = cs.filter(c => c.peso).map(c => ({x:ddmm(deIso(c.data)), y:c.peso}));
+  const cin = cs.filter(c => c.cintura).map(c => ({x:ddmm(deIso(c.data)), y:c.cintura}));
+  const dp = pts.length > 1 ? pts[pts.length-1].y - pts[0].y : 0;
+  return `
+    <div class="card hero" style="gap:8px"><span class="eyebrow">Últimas 4 semanas</span>
+      <h2 style="max-width:none">${ton(ult4)} levantadas</h2>
+      <div class="meta"><span>${dv >= 0 ? "▲" : "▼"} ${sinal(dv)}% de volume vs. as 4 semanas anteriores</span></div></div>
+    <div class="card"><div class="row sb"><span class="eyebrow">Volume por semana (toneladas)</span><span class="tiny muted">esta semana: ${semAtual.n}/${meta} treinos</span></div>${barras(sem)}
+      <p class="tiny muted">Volume = carga × repetições de todas as séries. Subindo devagar, semana a semana, é sinal de progresso.</p></div>
+    <div class="kpis">
+      <div class="kpi"><b style="color:var(--ok)">${sinal(forca)}%</b><span>força média (cargas em 12 semanas)</span></div>
+      <div class="kpi"><b>${prs30}</b><span>recordes em 30 dias</span></div>
+      <div class="kpi"><b>${fmt(rpe,1)}<small class="muted" style="font-size:.9rem">/10</small></b><span>esforço médio dos treinos</span></div>
+      <div class="kpi"><b>${fmt(horas,0)}h</b><span>treinando em 30 dias</span></div>
+    </div>
+    <div class="sec"><h2>Quem mais evoluiu</h2><button type="button" class="lnk" data-a="seg" data-k="evo" data-v="cargas">Ver todas ›</button></div>
+    <div class="lista">${evol.slice(0,4).map((e,i) => `<div class="it"><span class="ic acc" style="font-weight:900">${i+1}º</span>
+      <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(ex(e.id).nome)}</span><span class="s">${fmt(e.de)} → <b style="color:var(--ink)">${fmt(e.para)} kg</b></span></span>
+      ${mini(historicoEx(ss, e.id).map(h => h.kg), 70, 28)}<span class="chip ok">${sinal(e.p)}%</span></div>`).join("")}</div>
+    <details class="card dt"><summary class="row"><span class="ic">⚖️</span><span class="grow"><b>Balança e medidas</b><br><span class="small muted">${fmt(pts.length ? pts[pts.length-1].y : null)} kg · ${fmt(cin.length ? cin[cin.length-1].y : null)} cm de cintura · dos check-ins</span></span><span class="seta muted">›</span></summary>
+      <span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts.length ? pts[pts.length-1].y : null)} kg</b>${pts.length > 1 ? `<span class="delta ${dp <= 0 ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde ${pts[0].x}</span>` : ""}</div>${grafico(pts, {h:120})}
+      <span class="eyebrow">Cintura</span>${grafico(cin, {h:110})}
+      <p class="small muted">A balança sozinha engana: peso parado com carga subindo e cintura caindo é ganho de músculo e perda de gordura.</p></details>`;
+}
+
+function evoCargas(ss){
+  const ts = treinosDe(EU);
+  return `<p class="small muted">Toque num treino pra ver a carga de cada exercício.</p>` + ts.map(t => {
+    const sess = ss.filter(s => s.letra === t.letra);
+    const vols = sess.map(s => s.volume), dv = vols.length > 1 ? pct(vols[vols.length-1], vols[0]) : 0;
+    const prs = sess.reduce((m,s) => m + s.prs.length, 0);
+    const aberto = sub.treinoEvo === t.letra;
+    return `<details class="card dt" data-fold="${t.letra}"${aberto ? " open" : ""}><summary class="row">
+        <span class="letra-b">${esc(t.letra)}</span>
+        <span class="grow stack" style="gap:2px"><b>${esc(t.nome)}</b><span class="small muted">${plural(sess.length,"treino")} · ${prs} recorde${prs === 1 ? "" : "s"}</span></span>
+        <span class="stack" style="align-items:flex-end;gap:2px">${mini(vols, 70, 26)}<span class="chip ${dv >= 0 ? "ok" : "bad"}">${sinal(dv)}%</span></span></summary>
+      <div class="stack" style="gap:10px;margin-top:12px">
+        <div class="card flat" style="background:var(--bg)"><span class="eyebrow">Volume do treino ${esc(t.letra)} (kg)</span>
+          <div class="big"><b>${ton(vols[vols.length-1] || 0)}</b><span class="delta ${dv >= 0 ? "ok" : "bad"}">${sinal(dv)}% desde o 1º</span></div>
+          ${grafico(sess.map(s => ({x:ddmm(deIso(s.data)), y:s.volume})), {h:110, casas:0})}</div>
+        ${t.exs.map(e => cardCargaEx(sess, e)).join("")}
+      </div></details>`;
+  }).join("") + `<div class="card row flat"><span class="ic acc">🏆</span><span class="grow"><b>${ss.reduce((m,x) => m + x.prs.length, 0)} recordes</b><br><span class="small muted">batidos nas últimas 12 semanas</span></span></div>`;
+}
+function cardCargaEx(sess, e){
+  const info = ex(e.id), h = historicoEx(sess, e.id);
+  if (!h.length){
+    const u = sess.slice().reverse().find(s => s.series.some(z => z.ex === e.id));
+    const sr = u ? u.series.filter(z => z.ex === e.id) : [];
+    return `<div class="excarga"><div class="row sb"><b class="ellip">${esc(info.nome)}</b><span class="chip">peso corporal</span></div>
+      <span class="small muted">${sr.length ? `Última: ${sr.map(z => z.reps).join(", ")} ${/s$/.test(e.reps) ? "seg" : "reps"}` : "Sem registro ainda"}</span></div>`;
+  }
+  const ult = h[h.length-1], rec = Math.max(...h.map(x => x.kg)), d = pct(ult.kg, h[0].kg);
+  return `<div class="excarga">
+    <div class="row sb"><b class="ellip">${esc(info.nome)}</b><span class="chip ${d > 0 ? "ok" : ""}">${d > 0 ? sinal(d) + "%" : "mantendo"}</span></div>
+    <div class="row"><span class="grow stack" style="gap:1px"><span class="kg">${fmt(ult.kg)} <small>kg</small></span>
+      <span class="tiny muted">começou com ${fmt(h[0].kg)} kg · recorde ${fmt(rec)} kg</span></span>${mini(h.map(x => x.kg), 110, 38)}</div>
+    <span class="small muted">Última (${quando(ult.s.data)}): ${ult.series.map(z => z.reps).join(", ")} reps · ${plural(ult.series.length,"série")}</span>
+  </div>`;
+}
+
+function evoFreq(ss){
+  const h = hoje0(), ini = addDias(inicioSemana(), -77);
+  const porDia = new Map(); ss.forEach(s => { (porDia.get(s.data) || porDia.set(s.data, []).get(s.data)).push(s); });
+  const sel = sub.diaSel || (ss.length ? ss[ss.length-1].data : iso(h));
+  /* cabeçalho com o mês em cima da primeira semana de cada mês */
+  let grade = `<span></span>` + Array.from({length:12}, (_,w) => { const d = addDias(ini, w*7), ant = addDias(d, -7);
+    return `<span class="mes">${w === 0 || d.getMonth() !== ant.getMonth() ? MES_C[d.getMonth()] : ""}</span>`; }).join("");
+  for (let d = 0; d < 7; d++){
+    grade += `<span class="lb">${SEM[d][0]}</span>`;
+    for (let w = 0; w < 12; w++){
+      const dd = addDias(ini, w*7 + d), k = iso(dd), x = porDia.get(k);
+      grade += dd > h ? `<span class="hc fut"></span>`
+        : `<button type="button" class="hc${x ? " on" : ""}${k === iso(h) ? " hj" : ""}${k === sel ? " sel" : ""}" data-a="dia" data-d="${k}" aria-label="${ddmm(dd)}${x ? ": treino " + x.map(s => s.letra).join(" e ") : ""}">${x ? esc(x[0].letra.slice(0,1)) : ""}</button>`;
+    }
+  }
+  const dSel = deIso(sel), xs = porDia.get(sel) || [];
+  const detalhe = `<div class="card" id="dia-det"><span class="eyebrow">${SEM_L[dow(dSel)]}, ${ddmm(dSel)}${sel === iso(h) ? " · hoje" : ""}</span>
+    ${xs.length ? xs.map(s => `<div class="row"><span class="letra-b">${esc(s.letra)}</span><span class="grow stack" style="gap:1px"><b>${esc(s.nome)}</b>
+        <span class="small muted">${s.dur} min · ${s.series.length} séries · ${ton(s.volume)} · esforço ${s.rpe}/10</span></span></div>
+      ${s.prs.length ? `<div class="chips">${s.prs.map(id => `<span class="chip acc">🏆 ${esc(ex(id).nome)}</span>`).join("")}</div>` : ""}
+      ${s.dor ? `<span class="chip bad" style="align-self:flex-start">🩹 ${esc(s.dor)}</span>` : ""}
+      ${s.coment ? `<div class="recado"><span class="av" style="--c:${corDe(EU)}">${esc(iniciais(aluno(EU).nome))}</span><p class="bolha">${esc(s.coment)}</p></div>` : ""}
+      <button type="button" class="btn sm" data-a="verSessao" data-id="${s.id}" style="align-self:flex-start">Ver as séries</button>`).join("")
+    : `<p class="muted">${dSel > h ? "Esse dia ainda não chegou." : "Dia sem treino. Descanso também faz parte 😴"}</p>`}</div>`;
+  const m30 = ss.filter(x => diasDesde(x.data) < 30).length, meta = aluno(EU).meta;
+  const sem = semanasDe(ss).reverse();
+  return `<div class="card"><div class="row sb"><span class="eyebrow">Últimas 12 semanas</span><span class="tiny muted">toque num dia</span></div>
+      <div class="heat2">${grade}</div>
+      <div class="row tiny muted" style="gap:14px"><span class="row" style="gap:5px"><i class="hc on" style="width:12px;display:inline-block"></i>treinou (letra do treino)</span><span class="row" style="gap:5px"><i class="hc" style="width:12px;display:inline-block"></i>descanso</span></div></div>
+    ${detalhe}
+    <div class="kpis"><div class="kpi"><b>${m30}</b><span>treinos em 30 dias</span></div><div class="kpi"><b>${fmt(m30/30*7,1)}</b><span>treinos por semana</span></div>
+      <div class="kpi"><b>${sequenciaSemanas(EU)}</b><span>semanas seguidas na meta</span></div><div class="kpi"><b>${Math.round(aderencia(EU)*100)}%</b><span>aderência ao plano</span></div></div>
+    <div class="sec"><h2>Semana a semana</h2></div>
+    <div class="lista">${sem.map(s => `<details class="dt semdet"${s.w === 0 ? " open" : ""}><summary class="it">
+        <span class="grow stack" style="gap:1px"><span class="t">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `${ddmm(s.ini)} a ${ddmm(addDias(s.ini,6))}`}</span><span class="s">${ton(s.vol)} · ${fmt(s.min/60,1)}h treinando</span></span>
+        <span class="chip ${s.n >= meta ? "ok" : s.w === 0 ? "acc" : "warn"}">${s.n}/${meta}</span><span class="seta">›</span></summary>
+      <div class="diasem">${SEM.map((n,i) => { const dd = addDias(s.ini, i), x = porDia.get(iso(dd)) || [];
+        return x.length ? x.map(z => `<button type="button" class="dl" data-a="verSessao" data-id="${z.id}"><span class="muted">${n} ${ddmm(dd)}</span><span class="letra-b" style="width:26px;height:26px;font-size:.75rem;border-radius:8px">${esc(z.letra)}</span><span class="ellip">${esc(z.nome)}${z.prs.length ? " 🏆" : ""}</span><span class="muted mono">${z.dur}'</span></button>`).join("")
+          : `<div class="dl vazio-d"><span class="muted">${n} ${ddmm(dd)}</span><span></span><span class="muted">${dd > hoje0() ? "" : iso(dd) === iso(hoje0()) ? "hoje" : "descanso"}</span><span></span></div>`; }).join("")}</div></details>`).join("")}</div>`;
+}
+
+function evoFotos(){
+  const silh = `<svg viewBox="0 0 40 80"><circle cx="20" cy="9" r="7"/><path d="M9 20h22l-2 26h-4l-1 30h-8l-1-30h-4z"/></svg>`;
+  return `<p class="small muted">Fotos ficam só entre você e o ${esc(MARCA.curto)}, nunca públicas. Mesma luz, mesmo lugar, mesma roupa: a comparação fica justa.</p>
+    <div class="fotos">
+      <div class="foto">${silh}<span>Fev · início</span></div>
+      <div class="foto">${silh}<span>Jun</span></div>
+      ${S.fotos.map(f => `<div class="foto" style="background-image:url(${f.src})"><span>${esc(f.rot)}</span></div>`).join("")}
+      <label class="foto add"><b>+</b>Nova foto<input type="file" accept="image/*" data-in="foto" hidden></label>
+    </div>
+    <div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`;
 }
 
 /* ================= ALUNO · Check-in ================= */
@@ -1012,6 +1135,7 @@ const A = {
   pix: folhaPix,
   copiar(el){ try { navigator.clipboard.writeText(el.dataset.t); toast("Chave Pix copiada"); } catch(e){ toast("Não deu pra copiar"); } },
   exEvo(el){ sub.exEvo = el.dataset.id; render(); },
+  dia(el){ sub.diaSel = el.dataset.d; render(); const d = $("dia-det"); if (d) d.scrollIntoView({behavior:"smooth", block:"nearest"}); },
   ck(el){ const c = el.dataset.c, v = +el.dataset.v; CK[c] = v; render(); },
   passo(el){ const c = el.dataset.c; CK[c] = Math.round(((CK[c] || 0) + +el.dataset.d)*10)/10; render(); },
   ckForcar(){ sub.ckForcar = true; render(); },

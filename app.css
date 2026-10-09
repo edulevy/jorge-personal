@@ -207,6 +207,30 @@ details.dt[open]>summary .seta{transform:rotate(90deg)}
 .heat i.on{background:var(--accent)}
 .heat i.fut{background:transparent;border:1px dashed var(--line)}
 
+/* evolução: desempenho, cargas, frequência */
+.mini-g{flex:none;overflow:visible}
+.mini-g path{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.mini-g circle{fill:var(--accent)}
+.graf .barra{fill:var(--accent)} .graf .barra.atual{opacity:.45}
+.excarga{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+.excarga .kg{font-size:1.5rem;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.excarga .kg small{font-size:.8rem;color:var(--muted);font-weight:700}
+.heat2{display:grid;grid-template-columns:16px repeat(12,1fr);gap:4px;align-items:center}
+.heat2 .lb{font-size:.62rem;color:var(--muted);font-weight:800;text-align:center}
+.heat2 .mes{font-size:.6rem;color:var(--muted);font-weight:800;white-space:nowrap;overflow:visible}
+.hc{aspect-ratio:1;border-radius:5px;border:0;background:var(--sunk);padding:0;font-size:.62rem;font-weight:900;color:var(--accent-ink);display:grid;place-items:center;min-width:0;font-family:var(--f-body)}
+.hc.on{background:var(--accent)}
+.hc.fut{background:transparent;border:1px dashed var(--line)}
+.hc.hj{box-shadow:inset 0 0 0 2px var(--ink)}
+.hc.sel{outline:2.5px solid var(--ink);outline-offset:1.5px}
+.semdet{border-bottom:1px solid var(--line)} .semdet:last-child{border-bottom:0}
+.semdet>summary.it{display:flex;align-items:center;gap:10px;padding:12px 14px;list-style:none;cursor:pointer}
+.semdet>summary::-webkit-details-marker{display:none}
+.semdet[open]>summary .seta{transform:rotate(90deg)}
+.diasem{display:flex;flex-direction:column;padding:0 14px 8px}
+.dl{display:grid;grid-template-columns:78px 28px 1fr auto;gap:8px;align-items:center;padding:5px 0;border:0;border-top:1px dashed var(--line);background:none;text-align:left;font-size:.86rem;width:100%;min-height:40px;color:var(--ink)}
+.dl.vazio-d{opacity:.7}
+
 /* fotos */
 .fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .foto{aspect-ratio:3/4;border-radius:12px;background:var(--sunk);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:6px;

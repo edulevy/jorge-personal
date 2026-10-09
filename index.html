@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Jorge Personal</title>
+<meta name="description" content="Protótipo do app de consultoria online do Jorge: treino, check-in, evolução e painel do treinador.">
+<meta name="theme-color" content="#f3f2ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f11" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Jorge">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icones/icone-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icones/icone-180.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- escolha de perfil (protótipo: na versão de verdade é o login) -->
+<div class="entrada" id="entrada" hidden></div>
+
+<header class="top" id="topo">
+  <div class="top-in">
+    <span class="logo sm" id="top-logo"></span>
+    <div class="top-t">
+      <span class="eyebrow" id="top-sub"></span>
+      <h1 id="top-tit"></h1>
+    </div>
+    <button type="button" class="troca" id="troca" aria-label="Trocar de perfil"><i></i><span id="troca-txt"></span></button>
+  </div>
+</header>
+
+<main id="main"><div class="view" id="tela"></div></main>
+
+<nav class="tabbar" id="tabbar" aria-label="Seções"></nav>
+
+<!-- treino em andamento -->
+<div class="exec" id="exec" hidden></div>
+<div class="descanso" id="descanso" aria-live="polite"></div>
+
+<!-- folha que sobe de baixo -->
+<div class="veu" id="veu" hidden></div>
+<section class="folha" id="folha" role="dialog" aria-modal="true" aria-labelledby="folha-tit" hidden>
+  <div class="pega"></div>
+  <div class="fh"><h2 id="folha-tit"></h2><button type="button" class="fechar" data-a="fechar" aria-label="Fechar">✕</button></div>
+  <div class="fc" id="folha-c"></div>
+</section>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="dados.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 /* Guarda o app no celular pra abrir sem internet (academia com sinal ruim).
    Ao publicar uma versão nova, sobe o número de VERSAO: o celular baixa tudo de novo. */
-const VERSAO = "jorge-v2";
-const ARQUIVOS = ["./", "index.html", "app.css", "dados.js", "app.js", "manifest.webmanifest",
+const VERSAO = "jorge-v3";
+const ARQUIVOS = ["./", "index.html", "app.css", "config.js", "banco.js", "dados.js", "app.js", "manifest.webmanifest",
   "icones/icone-180.png", "icones/icone-192.png", "icones/icone-512.png"];
 
 self.addEventListener("install", e => {
@@ -15,6 +15,8 @@ self.addEventListener("activate", e => {
 /* com internet: busca a versão nova e atualiza a cópia; sem internet: usa a cópia */
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+  /* banco e login (outro endereço) nunca vão pro cache: dado de aluno não fica guardado no aparelho */
+  if (new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(
     fetch(e.request, {cache: "no-cache"})
       .then(r => { const copia = r.clone(); caches.open(VERSAO).then(c => c.put(e.request, copia)); return r; })

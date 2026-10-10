@@ -1,6 +1,8 @@
 (function(){
 "use strict";
 const D = window.DADOS;
+/* modo nuvem: config.js preenchido → login e dados no banco. Sem config, é a demonstração de sempre */
+const NUVEM = window.BANCO;
 const {MARCA, EX, MODELOS, ALUNOS, HABITOS, DORES} = D;
 
 /* ================= utilidades ================= */
@@ -36,7 +38,7 @@ const wa = txt => `https://wa.me/?text=${encodeURIComponent(txt)}`;
 const repsNum = r => { const m = String(r).match(/\d+/g); return m ? +m[m.length-1] : 0; };
 const numIn = v => { const n = parseFloat(String(v).replace(",",".")); return isNaN(n) ? null : n; };
 const arred = x => x < 20 ? Math.round(x*2)/2 : Math.round(x/2.5)*2.5;
-const uid = () => Math.random().toString(36).slice(2,9);
+const uid = () => NUVEM ? crypto.randomUUID() : Math.random().toString(36).slice(2,9);
 const plural = (n, s, p) => `${n} ${n === 1 ? s : (p || s + "s")}`;
 function rng(seed){ let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
@@ -64,7 +66,16 @@ function carregar(){
   } catch(e){}
   return null;
 }
-function salvar(){ store.set(CHAVE, JSON.stringify(S)); }
+const CHAVE_NUVEM = "jorge-personal:nuvem";
+/* na nuvem o celular só guarda a aba aberta e o treino em andamento; o resto mora no banco */
+function salvar(){ NUVEM ? store.set(CHAVE_NUVEM, JSON.stringify({aba:S.aba, exec:S.exec})) : store.set(CHAVE, JSON.stringify(S)); }
+/* manda pro banco sem travar a tela; se der erro de permissão, avisa */
+function nuvem(op, ...args){
+  if (!NUVEM) return;
+  NUVEM.gravar(op, ...args)
+    .then(r => { if (r === "fila") toast("Sem internet: salvo no celular, sobe quando voltar o sinal"); })
+    .catch(e => { console.error(e); toast("Não salvou no banco: " + (e.message || e)); });
+}
 
 const aluno = id => ALUNOS.find(a => a.id === id);
 const ex = id => EX[id] || S.exExtra[id] || {nome:id, grupo:"", local:"academia", dica:"", alt:[]};
@@ -304,7 +315,7 @@ function render(){
   $("entrada").hidden = true;
   const p = S.papel, aba = S.aba[p];
   $("top-logo").textContent = MARCA.iniciais;
-  $("troca-txt").textContent = p === "aluno" ? "Marina" : "Jorge";
+  $("troca-txt").textContent = NUVEM ? "Sair" : p === "aluno" ? "Marina" : "Jorge";
   const badge = {checkin: checkinDevido() ? "1" : "", painel: checkinsPendentes().length || ""};
   $("tabbar").innerHTML = ABAS[p].map(([id, nome, ic]) =>
     `<button type="button" data-a="aba" data-v="${id}"${id === aba ? ' aria-current="page"' : ""}>${svg(ic)}<span>${nome}</span>${badge[id] ? `<b class="dot">${badge[id]}</b>` : ""}</button>`).join("");
@@ -321,7 +332,7 @@ const segAtual = (chave, padrao) => sub[chave] || padrao;
 const dataHoje = () => { const h = hoje0(); return `${SEM_L[dow(h)]}, ${h.getDate()} de ${MESES[h.getMonth()]}`; };
 
 /* ================= ALUNO · Hoje ================= */
-const EU = "marina";
+let EU = "marina";  // na nuvem vira o id do aluno logado
 function checkinDevido(){ const c = ultimoCheckin(EU); return !c || diasDesde(c.data) >= 7; }
 
 function vHoje(){
@@ -596,12 +607,12 @@ function evoFotos(){
   const silh = `<svg viewBox="0 0 40 80"><circle cx="20" cy="9" r="7"/><path d="M9 20h22l-2 26h-4l-1 30h-8l-1-30h-4z"/></svg>`;
   return `<p class="small muted">Fotos ficam só entre você e o ${esc(MARCA.curto)}, nunca públicas. Mesma luz, mesmo lugar, mesma roupa: a comparação fica justa.</p>
     <div class="fotos">
-      <div class="foto">${silh}<span>Fev · início</span></div>
-      <div class="foto">${silh}<span>Jun</span></div>
+      ${NUVEM ? "" : `<div class="foto">${silh}<span>Fev · início</span></div>
+      <div class="foto">${silh}<span>Jun</span></div>`}
       ${S.fotos.map(f => `<div class="foto" style="background-image:url(${f.src})"><span>${esc(f.rot)}</span></div>`).join("")}
       <label class="foto add"><b>+</b>Nova foto<input type="file" accept="image/*" data-in="foto" hidden></label>
     </div>
-    <div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`;
+    ${NUVEM ? "" : `<div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`}`;
 }
 
 /* ================= ALUNO · Check-in ================= */
@@ -838,7 +849,7 @@ function salvarTreino(){
   const vol = series.reduce((m,z) => m + (z.kg || 0)*(z.reps || 0), 0);
   const ses = {id:uid(), aluno:EU, data:iso(hoje0()), ts:Date.now(), letra:E.letra, nome:t.nome, dur:Math.max(1, Math.round((Date.now() - E.inicio)/60000)),
     series, volume:Math.round(vol), rpe:FIM.rpe || 8, dor: FIM.temDor === 1 ? (FIM.dor || "Sem detalhe") : null, coment:(FIM.coment || "").trim(), prs};
-  S.sessoes.push(ses); S.exec = null; salvar();
+  S.sessoes.push(ses); S.exec = null; salvar(); nuvem("sessao", ses);
   Object.keys(FIM).forEach(k => delete FIM[k]);
   pararDescanso();
   $("exec").hidden = true;
@@ -942,11 +953,12 @@ function folhaAluno(id){
   abrirFolha(a.nome, () => {
     const v = diasAteVenc(id), [c, t] = statusAluno(a), cs = checkinsDe(id), uc = cs[cs.length-1];
     let pts = cs.filter(z => z.peso).map(z => ({x:ddmm(deIso(z.data)), y:z.peso}));
-    if (pts.length < 3){ const n = 8; pts = Array.from({length:n}, (_,i) => ({x: i === 0 ? `há ${a.desde}m` : i === n-1 ? "agora" : "", y: Math.round((a.peso0 + (a.peso - a.peso0)*(i/(n-1)) + (i && i < n-1 ? Math.sin(i*1.7)*.35 : 0))*10)/10})); }
-    const dp = pts[pts.length-1].y - pts[0].y;
+    const semPeso = NUVEM && pts.length < 2;
+    if (pts.length < 3 && !NUVEM){ const n = 8; pts = Array.from({length:n}, (_,i) => ({x: i === 0 ? `há ${a.desde}m` : i === n-1 ? "agora" : "", y: Math.round((a.peso0 + (a.peso - a.peso0)*(i/(n-1)) + (i && i < n-1 ? Math.sin(i*1.7)*.35 : 0))*10)/10})); }
+    const dp = semPeso ? 0 : pts[pts.length-1].y - pts[0].y;
     const semanas = [3,2,1,0].map(w => ({w, n: sessoesSemana(id, w).length}));
     const al = alertas().filter(x => x.a.id === id);
-    return `<div class="row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><span class="small muted">${a.idade} anos · aluno há ${plural(a.desde,"mês","meses")}</span>
+    return `<div class="row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><span class="small muted">${a.idade ? a.idade + " anos · " : ""}aluno há ${plural(a.desde,"mês","meses")}</span>
         <div class="chips"><span class="chip info">${esc(a.tipo)}</span><span class="chip ${c}">treino ${t}</span></div></div></div>
       ${al.map(x => `<div class="demo" style="border-color:var(--${x.cls === "bad" ? "bad" : "warn"});background:var(--${x.cls === "bad" ? "bad" : "warn"}-soft)"><span>${x.ic}</span><span>${esc(x.t)}</span></div>`).join("")}
       <div class="btns"><a class="btn wa" href="${wa(`Oi ${primeiro(a.nome)}! `)}" target="_blank" rel="noopener">WhatsApp</a><button type="button" class="btn" data-a="editarTreino" data-id="${id}">Editar treino</button></div>
@@ -955,7 +967,7 @@ function folhaAluno(id){
         <p class="small muted">Programa: <b style="color:var(--ink)">${esc(programaDe(id))}</b> · meta ${a.meta}x por semana</p></div>
       <div class="card flat"><span class="eyebrow">Frequência · últimas 4 semanas</span>
         ${semanas.map(s => `<div class="row"><span class="small" style="width:92px">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `Há ${s.w} semanas`}</span><span class="bar grow"><i style="width:${Math.min(100, s.n/a.meta*100)}%;--c:${s.n >= a.meta ? "var(--ok)" : s.w === 0 ? "var(--accent)" : "var(--warn)"}"></i></span><span class="small mono" style="width:30px;text-align:right">${s.n}/${a.meta}</span></div>`).join("")}</div>
-      <div class="card flat"><span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts[pts.length-1].y)} kg</b><span class="delta ${(/emagre|defini/i.test(a.objetivo) ? dp <= 0 : dp >= 0) ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde o início</span></div>${grafico(pts, {h:120})}</div>
+      ${semPeso ? `<div class="card flat"><span class="eyebrow">Peso</span><p class="small muted">O gráfico aparece depois de 2 check-ins com peso.</p></div>` : `<div class="card flat"><span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts[pts.length-1].y)} kg</b><span class="delta ${(/emagre|defini/i.test(a.objetivo) ? dp <= 0 : dp >= 0) ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde o início</span></div>${grafico(pts, {h:120})}</div>`}
       ${uc ? `<div class="sec"><h2>Último check-in</h2></div>${blocoCheckin(uc, "jorge")}${!uc.resposta ? `<button type="button" class="btn pri full" data-a="responderCk" data-id="${uc.id}">Responder check-in</button>` : ""}` : ""}
       <div class="sec"><h2>Últimos treinos</h2></div>
       <div class="lista">${sessoesDe(id).slice(-5).reverse().map(x => `<button type="button" class="it" data-a="verSessao" data-id="${x.id}"><span class="letra-b" style="width:34px;height:34px;font-size:.85rem">${esc(x.letra)}</span>
@@ -1119,6 +1131,15 @@ function folhaRecado(){
     <button type="button" class="btn pri full" data-a="salvarRecado">Publicar pra todos</button>`, true);
 }
 
+function folhaCadastrarAluno(){
+  abrirFolha("Cadastrar aluno", () => `<div class="campo"><label for="na-n">Nome</label><input id="na-n" class="inp" placeholder="Nome do aluno"></div>
+    <div class="campo"><label for="na-e">E-mail do aluno</label><input id="na-e" class="inp" type="email" inputmode="email" placeholder="É com ele que o aluno vai entrar"></div>
+    <div class="campo"><span class="lbl">Plano</span><div class="chips">${["Online","Presencial","Híbrido"].map((t,i) => `<button type="button" class="chip" data-a="naTipo" data-v="${t}" aria-pressed="${i === 0}">${t}</button>`).join("")}</div></div>
+    <div class="campo"><label for="na-v">Mensalidade (R$)</label><input id="na-v" class="inp" inputmode="decimal" placeholder="250"></div>
+    <div class="demo"><span>🔐</span><span>Só entra no app quem estiver cadastrado aqui. O aluno vê os próprios dados; as suas anotações sobre ele ficam só com você.</span></div>
+    <button type="button" class="btn pri full" data-a="cadastrarAluno">Cadastrar</button>`, true);
+}
+
 /* ================= eventos ================= */
 const A = {
   papel(el){ S.papel = el.dataset.p; salvar(); $("entrada").hidden = true; render(); $("main").scrollTop = 0; },
@@ -1130,7 +1151,7 @@ const A = {
   comecar(el){ fecharFolha(); comecar(el.dataset.l); },
   abrirExec, verTreino(el){ sub.treinos = "meus"; sub.abrirTreino = el.dataset.l; irAba("treinos"); },
   verSessao(el){ folhaSessao(el.dataset.id); },
-  habito(el){ const k = iso(hoje0()), h = S.habitos[k] = S.habitos[k] || {}; h[el.dataset.id] = !h[el.dataset.id]; salvar(); render();
+  habito(el){ const k = iso(hoje0()), h = S.habitos[k] = S.habitos[k] || {}; h[el.dataset.id] = !h[el.dataset.id]; salvar(); nuvem("habito", EU, k, el.dataset.id, h[el.dataset.id]); render();
     if (HABITOS.every(x => h[x.id])) toast("Todos os hábitos de hoje feitos! 🎯"); },
   pix: folhaPix,
   copiar(el){ try { navigator.clipboard.writeText(el.dataset.t); toast("Chave Pix copiada"); } catch(e){ toast("Não deu pra copiar"); } },
@@ -1141,8 +1162,9 @@ const A = {
   ckForcar(){ sub.ckForcar = true; render(); },
   enviarCk(){
     if (!CK.sono || !CK.energia || !CK.estresse || !CK.dieta){ toast("Responde as 4 carinhas antes de enviar 🙂"); return; }
-    S.checkins.push({id:uid(), aluno:EU, data:iso(hoje0()), ts:Date.now(), peso:CK.peso, cintura:CK.cintura, sono:CK.sono, energia:CK.energia,
-      estresse:CK.estresse, dieta:CK.dieta, dor: CK.temDor === 1 ? (CK.dor || "Sem detalhe") : null, coment:(CK.coment || "").trim(), resposta:null, respData:null});
+    const ck = {id:uid(), aluno:EU, data:iso(hoje0()), ts:Date.now(), peso:CK.peso, cintura:CK.cintura, sono:CK.sono, energia:CK.energia,
+      estresse:CK.estresse, dieta:CK.dieta, dor: CK.temDor === 1 ? (CK.dor || "Sem detalhe") : null, coment:(CK.coment || "").trim(), resposta:null, respData:null};
+    S.checkins.push(ck); nuvem("checkin", ck);
     Object.keys(CK).forEach(k => delete CK[k]); sub.ckForcar = false;
     salvar(); render(); $("main").scrollTop = 0; toast("Check-in enviado pro Jorge ✅");
   },
@@ -1169,11 +1191,26 @@ const A = {
   rapida(el){ const t = $("resp-txt"); t.value = folhaResponder.rapidas[+el.dataset.i]; t.focus(); },
   enviarResp(el){
     const t = $("resp-txt").value.trim(); if (!t){ toast("Escreve a resposta ou toca numa pronta"); return; }
-    const c = S.checkins.find(z => z.id === el.dataset.id); c.resposta = t; c.respData = iso(hoje0()); salvar(); fecharFolha(); render();
+    const c = S.checkins.find(z => z.id === el.dataset.id); c.resposta = t; c.respData = iso(hoje0()); salvar(); nuvem("resposta", c.id, t); fecharFolha(); render();
     toast(`Resposta enviada pro ${primeiro(aluno(c.aluno).nome)} ✅`);
   },
   filtro(el){ filtro.tipo = el.dataset.v; render(); },
-  novoAluno(){ abrirFolha("Convidar aluno", () => `<div class="campo"><label for="na-n">Nome</label><input id="na-n" class="inp" placeholder="Nome do aluno"></div>
+  naTipo(el){ document.querySelectorAll('[data-a="naTipo"]').forEach(b => b.setAttribute("aria-pressed", b === el)); },
+  async cadastrarAluno(el){
+    const nome = $("na-n").value.trim(), email = $("na-e").value.trim(), valor = numIn($("na-v").value) || 0;
+    const sel = document.querySelector('[data-a="naTipo"][aria-pressed="true"]'), tipo = sel ? sel.dataset.v : "Online";
+    if (!nome || !/^\S+@\S+\.\S+$/.test(email)){ toast("Preenche o nome e um e-mail válido"); return; }
+    el.disabled = true;
+    try {
+      const a = await NUVEM.novoAluno({nome, email, tipo, valor});
+      ALUNOS.push(a); ALUNOS.sort((x,y) => x.nome.localeCompare(y.nome)); S.venc[a.id] = a.venc;
+      const link = location.origin + location.pathname;
+      abrirFolha("Convite pronto", () => `<div class="demo"><span>✅</span><span><b>${esc(nome)}</b> cadastrado. Quando ele entrar no app com <b>${esc(email)}</b>, a conta se liga sozinha à ficha.</span></div>
+        <a class="btn wa full" href="${wa(`Oi ${primeiro(nome)}! Bem-vindo(a) à consultoria ${MARCA.nome} 💪 Teu app: ${link} · Entra com o e-mail ${email}, toca no link que chegar e depois adiciona na tela inicial.`)}" target="_blank" rel="noopener">Mandar convite no WhatsApp</a>`, true);
+      render();
+    } catch(e){ el.disabled = false; toast(e.code === "23505" ? "Esse e-mail já está cadastrado" : "Não deu pra cadastrar: " + (e.message || e)); }
+  },
+  novoAluno(){ if (NUVEM) return folhaCadastrarAluno(); abrirFolha("Convidar aluno", () => `<div class="campo"><label for="na-n">Nome</label><input id="na-n" class="inp" placeholder="Nome do aluno"></div>
       <div class="campo"><label for="na-e">E-mail ou WhatsApp</label><input id="na-e" class="inp" placeholder="Pra onde vai o convite"></div>
       <div class="campo"><span class="lbl">Plano</span><div class="chips"><span class="chip info">Online</span><span class="chip">Presencial</span><span class="chip">Híbrido</span></div></div>
       <div class="demo"><span>🔐</span><span>O aluno recebe um link, cria a senha e instala o app. Só entra quem o ${esc(MARCA.curto)} convidar. No primeiro acesso ele preenche a anamnese e aceita o termo de uso dos dados (LGPD).</span></div>
@@ -1193,24 +1230,24 @@ const A = {
   edModelo(el){ const m = MODELOS.find(x => x.id === el.dataset.id); ED.treinos = clone(m.treinos); ED.programa = m.nome; ED.aba = 0; voltarFolha(); toast(`Modelo “${m.nome}” aplicado`); },
   edSalvar(){
     if (ED.treinos.some(t => !t.exs.length)){ toast("Tem treino sem exercício. Adiciona ou apaga ele."); return; }
-    S.treinos[ED.aluno] = ED.treinos; S.programa[ED.aluno] = ED.programa; salvar();
+    S.treinos[ED.aluno] = ED.treinos; S.programa[ED.aluno] = ED.programa; salvar(); nuvem("treinos", ED.aluno, ED.treinos, ED.programa);
     toast(`Treino de ${primeiro(aluno(ED.aluno).nome)} atualizado. Já aparece no app.`); fecharFolha(); render();
   },
   verModelo(el){ folhaModelo(el.dataset.id); },
-  modeloPara(el){ const m = MODELOS.find(x => x.id === el.dataset.m); S.treinos[el.dataset.id] = clone(m.treinos); S.programa[el.dataset.id] = m.nome; salvar(); fecharFolha(); render();
+  modeloPara(el){ const m = MODELOS.find(x => x.id === el.dataset.m); S.treinos[el.dataset.id] = clone(m.treinos); S.programa[el.dataset.id] = m.nome; salvar(); nuvem("treinos", el.dataset.id, S.treinos[el.dataset.id], m.nome); fecharFolha(); render();
     toast(`${m.nome} aplicado pra ${primeiro(aluno(el.dataset.id).nome)}`); },
   grupoEx(el){ sub.grupoEx = el.dataset.v; render(); },
   verEx(el){ folhaEx(el.dataset.id); },
   novoEx: folhaNovoEx,
   salvarEx(){
     const nome = $("nx-nome").value.trim(); if (!nome){ toast("Dá um nome pro exercício"); return; }
-    S.exExtra["x_" + uid()] = {nome, grupo:$("nx-grupo").value, local:$("nx-local").value, dica:$("nx-dica").value.trim(), alt:[]};
-    salvar(); fecharFolha(); render(); toast("Exercício cadastrado ✅");
+    const xid = "x_" + uid(), x = S.exExtra[xid] = {nome, grupo:$("nx-grupo").value, local:$("nx-local").value, dica:$("nx-dica").value.trim(), alt:[]};
+    salvar(); nuvem("exercicio", xid, x); fecharFolha(); render(); toast("Exercício cadastrado ✅");
   },
-  pago(el){ const id = el.dataset.id, v = deIso(S.venc[id]); S.venc[id] = iso(addDias(v, 30)); S.pagos[id] = iso(hoje0()); salvar(); render();
+  pago(el){ const id = el.dataset.id, v = deIso(S.venc[id]); S.venc[id] = iso(addDias(v, 30)); S.pagos[id] = iso(hoje0()); salvar(); nuvem("pago", id, aluno(id).valor, iso(v), S.venc[id]); render();
     toast(`${primeiro(aluno(id).nome)}: pago! Próximo vencimento ${ddmm(addDias(v,30))}`); },
   recado: folhaRecado,
-  salvarRecado(){ S.recado = $("recado-txt").value.trim() || S.recado; S.recadoData = iso(hoje0()); salvar(); fecharFolha(); render(); toast("Recado publicado pra todos os alunos"); }
+  salvarRecado(){ const t = $("recado-txt").value.trim(); S.recado = t || S.recado; S.recadoData = iso(hoje0()); salvar(); if (t) nuvem("recado", t); fecharFolha(); render(); toast("Recado publicado pra todos os alunos"); }
 };
 
 document.addEventListener("click", e => {
@@ -1219,7 +1256,9 @@ document.addEventListener("click", e => {
   e.preventDefault(); f(el, e);
 });
 $("veu").addEventListener("click", fecharFolha);
-$("troca").addEventListener("click", () => { S.papel = null; salvar(); $("exec").hidden = true; pararDescanso(); fecharFolha(); telaEntrada(); });
+$("troca").addEventListener("click", () => {
+  if (NUVEM){ if (confirm("Sair da sua conta neste celular?")) NUVEM.sair().then(() => { store.set(CHAVE_NUVEM, null); location.reload(); }); return; }
+  S.papel = null; salvar(); $("exec").hidden = true; pararDescanso(); fecharFolha(); telaEntrada(); });
 
 document.addEventListener("input", e => {
   const el = e.target, t = el.dataset && el.dataset.in; if (!t) return;
@@ -1242,8 +1281,14 @@ document.addEventListener("change", e => {
     fr.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const c = document.createElement("canvas"), k = Math.min(1, 360/img.width);
+        const c = document.createElement("canvas"), k = Math.min(1, (NUVEM ? 1080 : 360)/img.width);
         c.width = img.width*k; c.height = img.height*k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        if (NUVEM){
+          toast("Enviando foto…");
+          c.toBlob(b => NUVEM.foto(b).then(f => { S.fotos.push(f); render(); toast("Foto salva 📸"); })
+            .catch(e => toast("A foto não subiu: " + (e.message || e))), "image/jpeg", .8);
+          return;
+        }
         S.fotos.push({src:c.toDataURL("image/jpeg", .7), rot:ddmm(hoje0())}); if (S.fotos.length > 4) S.fotos.shift();
         salvar(); render(); toast("Foto salva 📸");
       };
@@ -1256,6 +1301,34 @@ document.addEventListener("change", e => {
 document.addEventListener("focusin", e => { if (e.target.matches && e.target.matches(".sr input, .ed-campos input")) setTimeout(() => e.target.select(), 0); });
 
 /* ================= início ================= */
+async function iniciarNuvem(){
+  const e = $("entrada");
+  e.innerHTML = `<div class="entrada-in"><p class="muted">Abrindo…</p></div>`; e.hidden = false;
+  try {
+    const eu = await NUVEM.iniciar();
+    if (!eu){ NUVEM.telaLogin(e, MARCA); return; }
+    if (eu.semConvite){ NUVEM.telaSemConvite(e, MARCA, eu); return; }
+    const d = await NUVEM.carregar();
+    ALUNOS.splice(0, ALUNOS.length, ...d.alunos);
+    let ui = {}; try { ui = JSON.parse(store.get(CHAVE_NUVEM)) || {}; } catch(x){}
+    const papel = eu.papel === "treinador" ? "jorge" : "aluno";
+    if (papel === "aluno") EU = eu.alunoId;
+    S = {v:2, semente: iso(hoje0()), papel, aba: Object.assign({aluno:"hoje", jorge:"painel"}, ui.aba), sessoes:d.sessoes, checkins:d.checkins,
+      treinos:d.treinos, programa:d.programa, venc:d.venc, pagos:d.pagos, habitos:d.habitos, fotos:d.fotos, exExtra:d.exExtra,
+      exec: papel === "aluno" ? ui.exec || null : null, recado:d.recado, recadoData:d.recadoData};
+    render();
+    if (S.exec) abrirExec();
+  } catch(x){
+    console.error(x);
+    e.innerHTML = `<div class="entrada-in"><div class="demo"><span>⚠️</span><span>Não deu pra abrir: ${esc(x.message || x)}</span></div>
+      <button type="button" class="btn pri full" onclick="location.reload()">Tentar de novo</button></div>`;
+  }
+}
+if (NUVEM){
+  iniciarNuvem();
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  return;
+}
 S = carregar() || semear();
 /* link direto: ?ver=jorge ou ?ver=aluno (pra mandar o link já na visão certa) */
 const qs = new URLSearchParams(location.search);

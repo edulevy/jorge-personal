@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 const D = window.DADOS;
-const {MARCA, EX, MODELOS, ALUNOS, HABITOS, DORES} = D;
+const {MARCA, EX, METODOS, MODELOS, ALUNOS, HABITOS, DORES} = D;
 
 /* ================= utilidades ================= */
 const $ = id => document.getElementById(id);
@@ -36,7 +36,9 @@ const wa = txt => `https://wa.me/?text=${encodeURIComponent(txt)}`;
 const repsNum = r => { const m = String(r).match(/\d+/g); return m ? +m[m.length-1] : 0; };
 const numIn = v => { const n = parseFloat(String(v).replace(",",".")); return isNaN(n) ? null : n; };
 const arred = x => x < 20 ? Math.round(x*2)/2 : Math.round(x/2.5)*2.5;
-const uid = () => Math.random().toString(36).slice(2,9);
+const semAcento = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const bate = (nome, q) => !q || q.split(/\s+/).every(w => semAcento(nome).includes(w));
+const uid = () =>Math.random().toString(36).slice(2,9);
 const plural = (n, s, p) => `${n} ${n === 1 ? s : (p || s + "s")}`;
 function rng(seed){ let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
@@ -53,36 +55,70 @@ const ICON = {
 const svg = (k, cls="") => `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true">${ICON[k]}</svg>`;
 
 /* ================= estado ================= */
-const CHAVE = "jorge-personal:v2";
+const CHAVE = "jorge-personal:v3";
 let S;
 
 function carregar(){
   try {
     const s = JSON.parse(store.get(CHAVE));
     /* demonstração "envelhecida" (aberta muitos dias depois): recomeça com datas novas */
-    if (s && s.v === 2 && diasDesde(s.semente) < 5) return s;
+    if (s && s.v === 3 && diasDesde(s.semente) < 5) return s;
   } catch(e){}
   return null;
 }
 function salvar(){ store.set(CHAVE, JSON.stringify(S)); }
 
 const aluno = id => ALUNOS.find(a => a.id === id);
-const ex = id => EX[id] || S.exExtra[id] || {nome:id, grupo:"", local:"academia", dica:"", alt:[]};
+const ex = id => Object.assign({}, EX[id] || S.exExtra[id] || {nome:id, grupo:"", local:"academia", dica:"", alt:[]}, S.midia[id] || {});
+const todosEx = () => Object.assign({}, EX, S.exExtra);
+const ehCardio = id => ["Cardio","Corrida"].includes(ex(id).grupo);
 const PLANO_B = [D.T_CASA, D.T_LIVRE];
+const todosModelos = () => MODELOS.concat(S.modelosExtra);
 const modeloDe = id => MODELOS.find(m => m.id === aluno(id).modelo) || MODELOS[0];
+const diasAteTroca = id => -diasDesde(S.troca[id]);
+/* exercícios ligados (🔗): 2 = bi-set, 3 = tri-set, 4 ou mais = circuito. Devolve, pra cada exercício, {pos, tam, nome} ou null */
+function ligacoes(exs){
+  const out = exs.map(() => null); let i = 0;
+  while (i < exs.length){
+    let j = i; while (j < exs.length - 1 && exs[j].jun) j++;
+    const tam = j - i + 1;
+    if (tam > 1) for (let k = i; k <= j; k++) out[k] = {pos:k - i + 1, tam, nome: tam === 2 ? "Bi-set" : tam === 3 ? "Tri-set" : "Circuito"};
+    i = j + 1;
+  }
+  return out;
+}
+/* linha de detalhes do exercício: séries × reps · descanso · cadência · RIR · método */
+function detalhes(e){
+  const p = [`${e.series} × ${esc(e.reps)}`];
+  if (e.desc && !e.jun) p.push(`descanso ${e.desc}s`);
+  if (e.cad) p.push(`cadência ${esc(e.cad)}`);
+  if (e.int) p.push(esc(e.int));
+  return p.join(" · ");
+}
+const chipMetodo = e => e.met && e.met !== "Normal" ? `<span class="chip acc">${esc(e.met)}</span>` : "";
+const chipLig = l => l ? `<span class="chip info">🔗 ${l.nome} ${l.pos}/${l.tam}</span>` : "";
+/* link do YouTube → endereço do vídeo embutido (youtu.be, watch?v=, shorts) */
+const ytId = u => { const m = String(u || "").match(/(?:youtu\.be\/|v=|shorts\/|embed\/)([\w-]{11})/); return m ? m[1] : null; };
+function midiaEx(id){
+  const x = ex(id), y = ytId(x.yt);
+  if (x.img) return `<img class="midia" src="${esc(x.img)}" alt="Demonstração: ${esc(x.nome)}">`;
+  if (y) return `<div class="video yt"><iframe src="https://www.youtube-nocookie.com/embed/${y}" title="${esc(x.nome)}" allow="encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+  return `<a class="video vazio-v" href="https://www.youtube.com/results?search_query=${encodeURIComponent(x.nome + " execução")}" target="_blank" rel="noopener"><span class="play"></span><span>O ${esc(MARCA.curto)} ainda não pôs GIF nem vídeo aqui · procurar no YouTube</span></a>`;
+}
 const treinosDe = id => S.treinos[id] || modeloDe(id).treinos;
 const programaDe = id => S.programa[id] || modeloDe(id).nome;
 const acharTreino = (id, letra) => treinosDe(id).find(t => t.letra === letra) || PLANO_B.find(t => t.letra === letra);
 const sessoesDe = id => S.sessoes.filter(s => s.aluno === id).sort((a,b) => a.ts - b.ts);
 const checkinsDe = id => S.checkins.filter(c => c.aluno === id).sort((a,b) => a.ts - b.ts);
-const durEst = t => Math.max(15, Math.round((t.exs.reduce((m,e) => m + e.series*(50 + (e.desc||0)), 0)/60 + (t.local === "academia" ? 8 : 0))/5)*5);
+const durEst = t => Math.max(15, Math.round((t.exs.reduce((m,e) => m + e.series*(/min/.test(e.reps) ? repsNum(e.reps)*60 : 50) + e.series*(e.jun ? 0 : e.desc||0), 0)/60 + (t.local === "academia" ? 8 : 0))/5)*5);
 const gruposDe = t => [...new Set(t.exs.map(e => ex(e.id).grupo).filter(g => g && g !== "Core" && g !== "Cardio"))];
 
 function semear(){
   const h = hoje0(), r = rng(20261009);
-  const s = {v:2, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], checkins:[], treinos:{}, programa:{},
-    venc:{}, pagos:{}, habitos:{}, fotos:[], exExtra:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2))};
-  ALUNOS.forEach(a => { s.venc[a.id] = iso(addDias(h, a.venc)); });
+  const s = {v:3, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], checkins:[], treinos:{}, programa:{},
+    venc:{}, pagos:{}, habitos:{}, fotos:[], exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2))};
+  /* troca quinzenal: cada aluno numa altura da quinzena (alguns já passaram da data) */
+  ALUNOS.forEach((a, i) => { s.venc[a.id] = iso(addDias(h, a.venc)); s.troca[a.id] = iso(addDias(h, a.id === "marina" ? 9 : (i*5) % 17 - 2)); });
 
   const fakeSessao = (aid, d, t, prog, comSeries) => {
     const series = []; let vol = 0;
@@ -386,11 +422,12 @@ function cardTreino(t, aid, aberto){
       <span class="letra-b ${cls}">${t.local === "casa" ? "🏠" : t.local === "livre" ? "🌳" : esc(t.letra)}</span>
       <span class="grow"><b>${esc(t.nome)}</b><br><span class="small muted">${plural(t.exs.length,"exercício")} · ~${durEst(t)} min${ultimo ? ` · feito ${quando(ultimo.data)}` : ""}</span></span>
       <span class="seta muted">›</span></summary>
-    <div class="trn">${t.exs.map((e,i) => {
+    <div class="trn">${(() => { const lg = ligacoes(t.exs); return t.exs.map((e,i) => {
       const u = seriesAnteriores(aid, e.id), kg = u && u.series[0].kg != null ? u.series[u.series.length-1].kg : e.carga;
-      return `<div class="ex"><span class="n">${i+1}</span><div class="grow stack" style="gap:2px"><b>${esc(ex(e.id).nome)}</b>
-        <span class="small muted">${e.series} × ${esc(e.reps)}${e.desc ? ` · descanso ${e.desc}s` : ""}${kg != null ? ` · <b style="color:var(--ink)">${fmt(kg)} kg</b>` : ""}</span>
-        ${e.obs ? `<span class="small" style="color:var(--warn)">${esc(e.obs)}</span>` : ""}</div></div>`;}).join("")}
+      return `<div class="ex${lg[i] && lg[i].pos < lg[i].tam ? " lig" : ""}${lg[i] && lg[i].pos > 1 ? " lig2" : ""}"><span class="n">${i+1}</span><div class="grow stack" style="gap:2px"><b>${esc(ex(e.id).nome)}</b>
+        <span class="small muted">${detalhes(e)}${kg != null ? ` · <b style="color:var(--ink)">${fmt(kg)} kg</b>` : ""}</span>
+        ${lg[i] || chipMetodo(e) ? `<span class="chips">${chipLig(lg[i])}${chipMetodo(e)}</span>` : ""}
+        ${e.obs ? `<span class="small" style="color:var(--warn)">${esc(e.obs)}</span>` : ""}</div></div>`;}).join(""); })()}
     </div>
     <button type="button" class="btn pri full" data-a="comecar" data-l="${esc(t.letra)}">Começar ${t.local === "academia" ? "treino " + esc(t.letra) : "este treino"}</button>
   </details>`;
@@ -400,7 +437,18 @@ function vTreinos(){
   let html = segm("treinos", [["meus","Meus treinos"],["hist","Histórico"]]);
   if (s === "meus"){
     const prox = proximoTreino(EU);
-    html += `<p class="small muted">Programa <b style="color:var(--ink)">${esc(programaDe(EU))}</b>, montado pelo ${esc(MARCA.curto)}. O próximo da fila é o <b style="color:var(--ink)">${esc(prox.letra)}</b>.</p>`;
+    const dt = diasAteTroca(EU);
+    html += `<p class="small muted">Programa <b style="color:var(--ink)">${esc(programaDe(EU))}</b>, montado pelo ${esc(MARCA.curto)}. O próximo da fila é o <b style="color:var(--ink)">${esc(prox.letra)}</b>.</p>
+      <div class="card row flat"><span class="ic info">🔄</span><span class="grow"><b>${dt > 0 ? `Treino novo em ${plural(dt,"dia")}` : "Treino novo chegando"}</b><br><span class="small muted">O ${esc(MARCA.curto)} troca o treino a cada 15 dias${dt > 0 ? ` · próxima troca ${ddmm(deIso(S.troca[EU]))}` : ""}</span></span></div>
+      <details class="card dt"><summary class="row"><span class="ic">📖</span><span class="grow"><b>Como ler o treino</b></span><span class="seta muted">›</span></summary>
+        <div class="stack small" style="gap:6px;margin-top:10px">
+          <span><b>Cadência 3-1-1-0:</b> 3 segundos descendo, 1 parado embaixo, 1 subindo, 0 parado em cima.</span>
+          <span><b>RIR 2:</b> termina a série sentindo que ainda faria mais 2 repetições. RIR 0 = até a falha.</span>
+          <span><b>RPE 8:</b> esforço 8 de 10 (o mesmo que RIR 2).</span>
+          <span><b>🔗 Bi-set:</b> faz um exercício e já emenda no outro, sem descanso. Descansa só no fim da dupla.</span>
+          <span><b>Drop-set:</b> chegou na falha, tira uns 30% da carga e continua.</span>
+          <span><b>Rest-pause:</b> chegou na falha, descansa 10–15 segundos e faz mais o que der.</span>
+        </div></details>`;
     html += treinosDe(EU).map(t => cardTreino(t, EU, t.letra === sub.abrirTreino)).join("");
     html += `<div class="sec"><h2>Plano B</h2></div>` + PLANO_B.map(t => cardTreino(t, EU, t.letra === sub.abrirTreino)).join("");
     sub.abrirTreino = null;
@@ -690,18 +738,21 @@ function cardExec(e, i, atual){
   const ultTxt = !u ? "Primeira vez nesse exercício"
     : `Última vez (${quando(u.data)}): <b>${kgs.length === 1 && kgs[0] != null ? fmt(kgs[0]) + " kg · " + u.series.map(z => z.reps).join(", ") + " reps"
       : u.series.map(z => (z.kg != null ? fmt(z.kg) + "×" : "") + z.reps).join(" · ")}</b>`;
-  const unid = /s$/.test(e.reps) ? "SEG" : /min/.test(e.reps) ? "MIN" : "REPS";
+  const unid = /s$/.test(e.reps) ? "SEG" : /min/.test(e.reps) ? "MIN" : /km/.test(e.reps) ? "KM" : "REPS";
+  const lg = ligacoes(exsExec())[i];
   return `<div class="exc${feito ? " feito" : ""}${atual ? " atual" : ""}" id="exc-${i}">
     <div class="exc-h"><span class="num-ex">${feito ? "✓" : i+1}</span><div class="grow stack" style="gap:3px">
       <h3>${esc(info.nome)}</h3>
-      <span class="small muted">${e.series} × ${esc(e.reps)}${e.desc ? ` · descanso ${e.desc}s` : ""}${e.trocadoDe ? ` · <span style="color:var(--info)">trocado</span>` : ""}</span>
+      <span class="small muted">${detalhes(e)}${e.trocadoDe ? ` · <span style="color:var(--info)">trocado</span>` : ""}</span>
+      ${lg || chipMetodo(e) ? `<span class="chips">${chipLig(lg)}${chipMetodo(e)}</span>` : ""}
       <span class="ult">${ultTxt}</span></div></div>
+    ${lg && lg.pos < lg.tam ? `<div class="dica"><span>🔗</span><span>Sem descanso: emenda direto no <b>${esc(ex(exsExec()[i+1].id).nome)}</b>.</span></div>` : ""}
     ${e.obs ? `<div class="obsj">📌 <b>${esc(MARCA.curto)}:</b> ${esc(e.obs)}</div>` : ""}
     ${E.dicas[i] === "dica" ? `<div class="dica"><span>💡</span><span><b>Como fazer:</b> ${esc(info.dica)}</span></div>` : ""}
-    ${E.dicas[i] === "video" ? `<div class="video"><span class="play"></span><span>Vídeo do ${esc(MARCA.curto)} demonstrando · entra na versão final</span></div>` : ""}
+    ${E.dicas[i] === "video" ? `<div style="margin:0 14px 10px">${midiaEx(e.id)}</div>` : ""}
     <div class="exc-acoes">
       <button type="button" data-a="dica" data-i="${i}" data-t="dica">💡 Como fazer</button>
-      <button type="button" data-a="dica" data-i="${i}" data-t="video">▶ Vídeo</button>
+      <button type="button" data-a="dica" data-i="${i}" data-t="video">▶ ${info.img ? "GIF" : "Vídeo"}</button>
       ${info.alt && info.alt.length ? `<button type="button" data-a="trocar" data-i="${i}">⇄ Trocar</button>` : ""}
     </div>
     <div class="series">
@@ -748,8 +799,13 @@ function marcarSerie(i, k){
   salvar();
   const cel = $("exc-" + i);
   if (z.ok){
-    const prox = proximaSerie(i, k);
-    if (prox) descansar(e.desc || 0, prox);
+    const lg = ligacoes(exs)[i];
+    if (lg && lg.pos < lg.tam){ pararDescanso(); toast(`🔗 Agora: ${ex(exs[i+1].id).nome}, sem descanso`); }
+    else {
+      /* fim da volta do bi-set: descansa e volta pro primeiro da dupla */
+      const prox = lg ? (E.sets[i - lg.pos + 1].some(q => !q.ok) ? `Próxima volta: ${ex(exs[i - lg.pos + 1].id).nome}` : proximaSerie(i, k)) : proximaSerie(i, k);
+      if (prox) descansar(e.desc || 0, prox);
+    }
   }
   /* redesenha só o necessário, sem perder a rolagem */
   const atual = exs.findIndex((x,j) => E.sets[j].some(q => !q.ok));
@@ -971,88 +1027,146 @@ function vMontar(){
   const s = segAtual("montar","alunos");
   let html = segm("montar", [["alunos","Por aluno"],["modelos","Modelos"],["exs","Exercícios"]]);
   if (s === "alunos"){
-    html += `<p class="small muted">Toque num aluno pra ajustar o treino. O aluno vê a mudança na hora, no app dele.</p>
-      <div class="lista">${ALUNOS.map(a => `<button type="button" class="it" data-a="editarTreino" data-id="${a.id}">${avatar(a)}
+    const ord = ALUNOS.slice().sort((a,b) => diasAteTroca(a.id) - diasAteTroca(b.id));
+    const vencidas = ord.filter(a => diasAteTroca(a.id) <= 3).length;
+    html += `<div class="card row flat"><span class="ic ${vencidas ? "warn" : "ok"}">🔄</span><span class="grow"><b>${vencidas ? `${plural(vencidas,"treino")} pra trocar nos próximos 3 dias` : "Nenhuma troca nos próximos dias"}</b><br>
+        <span class="small muted">Troca a cada 15 dias. Abre o aluno e toca em <b>Próxima quinzena</b>: o app copia o treino atual já com a progressão, e você só ajusta.</span></span></div>
+      <div class="lista">${ord.map(a => { const d = diasAteTroca(a.id);
+        return `<button type="button" class="it" data-a="editarTreino" data-id="${a.id}">${avatar(a)}
         <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(a.nome)}</span><span class="s ellip">${esc(programaDe(a.id))} · ${treinosDe(a.id).map(t => t.letra).join(" ")}</span></span>
-        ${S.treinos[a.id] ? `<span class="chip acc">editado</span>` : ""}<span class="seta">›</span></button>`).join("")}</div>`;
+        <span class="chip ${d < 0 ? "bad" : d <= 3 ? "warn" : ""}">${d < 0 ? `troca atrasada ${plural(-d,"dia")}` : d === 0 ? "trocar hoje" : `troca em ${d}d`}</span><span class="seta">›</span></button>`; }).join("")}</div>`;
   } else if (s === "modelos"){
-    html += `<p class="small muted">Modelos prontos: monta uma vez e aplica em vários alunos, ajustando só a carga.</p>
-      ${MODELOS.map(m => { const n = ALUNOS.filter(a => programaDe(a.id) === m.nome).length;
+    html += `<p class="small muted">Monta uma vez e aplica em vários alunos de uma vez. Depois ajusta só a carga de cada um. Também dá pra salvar o treino de um aluno como modelo, lá no editor.</p>
+      ${todosModelos().map(m => { const n = ALUNOS.filter(a => programaDe(a.id) === m.nome).length;
         return `<button type="button" class="card row" data-a="verModelo" data-id="${m.id}" style="text-align:left"><span class="letra-b">${m.treinos.length > 1 ? m.treinos.map(t => t.letra).join("") : "🏠"}</span>
         <span class="grow"><b>${esc(m.nome)}</b><br><span class="small muted">${esc(m.desc)} · ${plural(n,"aluno")}</span></span><span class="seta muted">›</span></button>`; }).join("")}`;
   } else {
-    const q = (sub.buscaEx || "").toLowerCase(), g = sub.grupoEx || "Todos";
-    const todos = Object.assign({}, EX, S.exExtra);
+    const q = semAcento(sub.buscaEx || ""), g = sub.grupoEx || "Todos";
+    const todos = todosEx();
     const grupos = ["Todos", ...new Set(Object.values(todos).map(x => x.grupo))];
-    const lst = Object.entries(todos).filter(([,x]) => (g === "Todos" || x.grupo === g) && (!q || x.nome.toLowerCase().includes(q)));
-    html += `<input class="inp" type="search" data-in="buscaEx" placeholder="Buscar exercício…" value="${esc(sub.buscaEx || "")}">
+    const lst = Object.entries(todos).filter(([,x]) => (g === "Todos" || x.grupo === g) && bate(x.nome, q));
+    const comMidia = Object.keys(todos).filter(id => ex(id).img || ex(id).yt).length;
+    html += `<p class="small muted">${plural(Object.keys(todos).length,"exercício")} · ${comMidia} com GIF ou vídeo. Busca sem acento funciona (“supino incl”).</p>
+      <input class="inp" type="search" data-in="buscaEx" placeholder="Buscar exercício…" value="${esc(sub.buscaEx || "")}">
       <div class="chips scroll">${grupos.map(x => `<button type="button" class="chip" data-a="grupoEx" data-v="${esc(x)}" aria-pressed="${x === g}">${esc(x)}</button>`).join("")}</div>
-      <div class="lista">${lst.map(([id,x]) => `<button type="button" class="it" data-a="verEx" data-id="${id}"><span class="ic">${x.local === "casa" ? "🏠" : x.local === "livre" ? "🌳" : "🏋️"}</span>
-        <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.nome)}</span><span class="s">${esc(x.grupo)}${S.exExtra[id] ? " · seu" : ""}</span></span><span class="seta">›</span></button>`).join("")}</div>
-      <button type="button" class="btn full" data-a="novoEx">+ Cadastrar exercício</button>`;
+      <div class="lista">${lst.map(([id,x]) => { const m = ex(id); return `<button type="button" class="it" data-a="verEx" data-id="${id}"><span class="ic">${m.img ? `<img src="${esc(m.img)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : x.local === "casa" ? "🏠" : x.local === "livre" ? "🌳" : "🏋️"}</span>
+        <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.nome)}</span><span class="s">${esc(x.grupo)}${S.exExtra[id] ? " · seu" : ""}${m.yt ? " · ▶ vídeo" : ""}${m.img ? " · GIF" : ""}</span></span><span class="seta">›</span></button>`; }).join("") || `<div class="vazio">Nenhum exercício com esse nome.</div>`}</div>
+      <button type="button" class="btn full" data-a="novoEx">+ Cadastrar exercício</button>
+      <div class="demo"><span>📥</span><span>Na versão final, sua lista de 300+ exercícios entra de uma vez por planilha (nome, grupo, link do vídeo). Não precisa cadastrar um por um.</span></div>`;
   }
   return {sub:"Montar e ajustar", tit:"Treinos", html};
 }
 function editarTreino(id){
-  ED = {aluno:id, treinos:clone(treinosDe(id)), programa:programaDe(id), aba:0};
+  ED = {aluno:id, treinos:clone(treinosDe(id)), programa:programaDe(id), troca:S.troca[id], aba:0, novaQ:false};
   abrirFolha(`Treino · ${primeiro(aluno(id).nome)}`, folhaEditor, true);
 }
+function campoEd(i, c, rot, v, extra = ""){
+  return `<label>${rot}<input data-in="ed" data-i="${i}" data-c="${c}" value="${esc(v ?? "")}" ${extra}></label>`;
+}
 function folhaEditor(){
-  const a = aluno(ED.aluno), t = ED.treinos[ED.aba];
+  const a = aluno(ED.aluno), t = ED.treinos[ED.aba], dt = -diasDesde(ED.troca);
+  const lg = t ? ligacoes(t.exs) : [];
   return `<div class="row"><span class="small muted grow">Programa: <b style="color:var(--ink)">${esc(ED.programa)}</b></span><button type="button" class="btn sm" data-a="aplicarModelo">Trocar modelo</button></div>
+    <div class="card row flat" style="padding:10px 12px"><span class="ic ${dt < 0 ? "bad" : dt <= 3 ? "warn" : "info"}">🔄</span>
+      <span class="grow"><b>${ED.novaQ ? "Quinzena nova montada" : dt < 0 ? `Troca atrasada ${plural(-dt,"dia")}` : `Troca em ${plural(dt,"dia")}`}</b><br><span class="small muted">${ED.novaQ ? "Vale" : "Treino vale"} até ${ddmm(deIso(ED.troca))}</span></span>
+      ${ED.novaQ ? "" : `<button type="button" class="btn sm pri" data-a="edQuinzena">Próxima quinzena</button>`}</div>
     ${a.restricao ? `<div class="demo" style="border-color:var(--warn);background:var(--warn-soft)"><span>📌</span><span>${esc(a.restricao)}</span></div>` : ""}
     <div class="seg">${ED.treinos.map((x,i) => `<button type="button" data-a="edAba" data-i="${i}" aria-pressed="${i === ED.aba}">${esc(x.letra)}</button>`).join("")}<button type="button" data-a="edNovo">+ Novo</button></div>
     ${t ? `<input class="inp" data-in="edNome" value="${esc(t.nome)}" aria-label="Nome do treino" style="font-weight:800">
-    <div class="lista">${t.exs.map((e,i) => `<div class="ed-ex">
+    <div class="lista">${t.exs.map((e,i) => { const cardio = ehCardio(e.id), mob = ex(e.id).grupo === "Mobilidade";
+      return `<div class="ed-ex${lg[i] && lg[i].pos < lg[i].tam ? " lig" : ""}">
       <div class="row"><span class="n" style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--sunk);display:grid;place-items:center;font-size:.7rem;font-weight:800">${i+1}</span><b class="grow">${esc(ex(e.id).nome)}</b>
         <span class="mini"><button type="button" data-a="edMover" data-i="${i}" data-d="-1" aria-label="Subir">↑</button><button type="button" data-a="edMover" data-i="${i}" data-d="1" aria-label="Descer">↓</button><button type="button" class="x" data-a="edTirar" data-i="${i}" aria-label="Remover">✕</button></span></div>
+      ${lg[i] || chipMetodo(e) ? `<div class="chips">${chipLig(lg[i])}${chipMetodo(e)}</div>` : ""}
       <div class="ed-campos">
-        <label>Séries<input inputmode="numeric" data-in="ed" data-i="${i}" data-c="series" value="${e.series}"></label>
-        <label>Reps<input data-in="ed" data-i="${i}" data-c="reps" value="${esc(e.reps)}"></label>
-        <label>Desc. (s)<input inputmode="numeric" data-in="ed" data-i="${i}" data-c="desc" value="${e.desc}"></label>
-        <label>Carga<input inputmode="decimal" data-in="ed" data-i="${i}" data-c="carga" value="${e.carga != null ? fmt(e.carga) : ""}" placeholder="—"></label>
+        ${campoEd(i,"series","Séries",e.series,'inputmode="numeric"')}
+        ${campoEd(i,"reps",cardio ? "Volume" : "Reps",e.reps,cardio ? 'placeholder="20 min"' : "")}
+        ${campoEd(i,"desc","Desc. (s)",e.desc,'inputmode="numeric"')}
+        ${cardio || mob ? campoEd(i,"int",cardio ? "Zona/ritmo" : "Lado",e.int,cardio ? 'placeholder="Zona 2"' : 'placeholder="cada"') : campoEd(i,"carga","Carga",e.carga != null ? fmt(e.carga) : "",'inputmode="decimal" placeholder="—"')}
       </div>
+      ${cardio || mob ? "" : `<div class="ed-campos">
+        ${campoEd(i,"cad","Cadência",e.cad,'placeholder="3-0-1-0"')}
+        ${campoEd(i,"int","RIR/RPE",e.int,'placeholder="RIR 2"')}
+        <label class="span2">Método<select data-in="ed" data-i="${i}" data-c="met">${METODOS.map(m => `<option${m === (e.met || "Normal") ? " selected" : ""}>${m}</option>`).join("")}</select></label>
+      </div>`}
       <input class="ed-obs" data-in="ed" data-i="${i}" data-c="obs" value="${esc(e.obs)}" placeholder="Observação pro aluno (opcional)">
-    </div>`).join("") || `<div class="vazio" style="border:0">Nenhum exercício ainda.</div>`}</div>
+      ${i < t.exs.length - 1 ? `<button type="button" class="lig-b" data-a="edLigar" data-i="${i}" aria-pressed="${!!e.jun}">🔗 ${e.jun ? "Ligado ao próximo (sem descanso entre eles)" : "Juntar com o próximo (bi-set)"}</button>` : ""}
+    </div>`; }).join("") || `<div class="vazio" style="border:0">Nenhum exercício ainda.</div>`}</div>
     <button type="button" class="btn full" data-a="edAdd">+ Adicionar exercício</button>
+    <div class="btns"><button type="button" class="btn sm" data-a="edDuplicar">Duplicar ${esc(t.letra)}</button><button type="button" class="btn sm" data-a="edComoModelo">Salvar como modelo</button></div>
     ${ED.treinos.length > 1 ? `<button type="button" class="lnk small" data-a="edApagar" style="color:var(--bad);align-self:center">Apagar treino ${esc(t.letra)}</button>` : ""}` : ""}
     <button type="button" class="btn pri full" data-a="edSalvar">Salvar e enviar pro aluno</button>`;
 }
+/* próxima quinzena: copia o programa atual com a progressão escolhida */
+const PROG = [
+  ["manter","Manter tudo","Mesmo treino, só renova a data"],
+  ["reps","+1 repetição","Ex.: 10 vira 11, 8–10 vira 9–11"],
+  ["carga","+2,5 kg","Nos exercícios com carga (halter: +1 kg)"],
+  ["serie","+1 série","Nos 2 primeiros exercícios de cada treino"]
+];
+function folhaQuinzena(){
+  const a = aluno(ED.aluno), dt = -diasDesde(ED.troca);
+  abrirFolha("Próxima quinzena", () => `<p class="small muted">O app copia o treino atual de ${esc(primeiro(a.nome))} e aplica a progressão. Depois você troca um exercício ou outro e salva. O treino antigo fica guardado no histórico.</p>
+    <div class="lista">${PROG.map(([id, n, d]) => `<button type="button" class="it" data-a="edProg" data-v="${id}"><span class="grow stack" style="gap:1px"><span class="t">${n}</span><span class="s">${d}</span></span><span class="chip acc">Usar</span></button>`).join("")}</div>
+    <p class="tiny muted">Começa ${dt > 0 ? `quando o atual vencer (${ddmm(deIso(ED.troca))})` : "hoje"} e vale 15 dias.</p>`);
+}
+const somaReps = (r, n) => String(r).replace(/\d+/g, x => +x + n);
+function aplicarProg(tipo){
+  const ini = -diasDesde(ED.troca) > 0 ? deIso(ED.troca) : hoje0();
+  (S.anteriores[ED.aluno] = S.anteriores[ED.aluno] || []).push({ate: iso(ini), programa: ED.programa, treinos: clone(ED.treinos)});
+  ED.treinos.forEach(t => t.exs.forEach((e, i) => {
+    if (tipo === "reps" && !ehCardio(e.id) && !/s$/.test(e.reps)) e.reps = somaReps(e.reps, 1);
+    if (tipo === "carga" && e.carga != null) e.carga = Math.round((e.carga + (/halter/i.test(ex(e.id).nome) ? 1 : 2.5))*10)/10;
+    if (tipo === "serie" && i < 2 && !ehCardio(e.id)) e.series += 1;
+  }));
+  ED.troca = iso(addDias(ini, 15)); ED.novaQ = true;
+}
 function folhaAddEx(){
   abrirFolha("Adicionar exercício", () => {
-    const q = (sub.buscaAdd || "").toLowerCase(), g = sub.grupoAdd || "Todos";
-    const todos = Object.assign({}, EX, S.exExtra), grupos = ["Todos", ...new Set(Object.values(todos).map(x => x.grupo))];
-    const lst = Object.entries(todos).filter(([,x]) => (g === "Todos" || x.grupo === g) && (!q || x.nome.toLowerCase().includes(q)));
-    return `<input class="inp" type="search" data-in="buscaAdd" placeholder="Buscar…" value="${esc(sub.buscaAdd || "")}">
+    const q = semAcento(sub.buscaAdd || ""), g = sub.grupoAdd || "Todos";
+    const todos = todosEx(), grupos = ["Todos", ...new Set(Object.values(todos).map(x => x.grupo))];
+    const lst = Object.entries(todos).filter(([,x]) => (g === "Todos" || x.grupo === g) && bate(x.nome, q));
+    return `<input class="inp" type="search" data-in="buscaAdd" placeholder="Buscar… (ex.: “remada”)" value="${esc(sub.buscaAdd || "")}">
       <div class="chips scroll">${grupos.map(x => `<button type="button" class="chip" data-a="grupoAdd" data-v="${esc(x)}" aria-pressed="${x === g}">${esc(x)}</button>`).join("")}</div>
-      <div class="lista">${lst.map(([id,x]) => `<button type="button" class="it" data-a="edEscolher" data-id="${id}"><span class="grow stack" style="gap:1px"><span class="t">${esc(x.nome)}</span><span class="s">${esc(x.grupo)}</span></span><span class="chip acc">+</span></button>`).join("")}</div>`;
+      <div class="lista">${lst.map(([id,x]) => `<button type="button" class="it" data-a="edEscolher" data-id="${id}"><span class="grow stack" style="gap:1px"><span class="t">${esc(x.nome)}</span><span class="s">${esc(x.grupo)}</span></span><span class="chip acc">+</span></button>`).join("") || `<div class="vazio">Nada com esse nome. Cadastra na aba Exercícios.</div>`}</div>`;
   });
 }
 function folhaModelos(){
   abrirFolha("Escolher modelo", () => `<p class="small muted">O treino atual do aluno é substituído pelo modelo. Depois é só ajustar.</p>
-    ${MODELOS.map(m => `<button type="button" class="card row" data-a="edModelo" data-id="${m.id}" style="text-align:left"><span class="grow"><b>${esc(m.nome)}</b><br><span class="small muted">${esc(m.desc)}</span></span><span class="chip acc">Usar</span></button>`).join("")}`);
+    ${todosModelos().map(m => `<button type="button" class="card row" data-a="edModelo" data-id="${m.id}" style="text-align:left"><span class="grow"><b>${esc(m.nome)}</b><br><span class="small muted">${esc(m.desc)}</span></span><span class="chip acc">Usar</span></button>`).join("")}`);
 }
+const selModelo = new Set();
 function folhaModelo(id){
-  const m = MODELOS.find(x => x.id === id);
-  abrirFolha(m.nome, () => `<p class="small muted">${esc(m.desc)}</p>${m.treinos.map(t => `<div class="card flat"><b>${esc(t.letra)} · ${esc(t.nome)}</b>
-    <div class="trn">${t.exs.map((e,i) => `<div class="ex"><span class="n">${i+1}</span><div class="grow"><b>${esc(ex(e.id).nome)}</b><br><span class="small muted">${e.series} × ${esc(e.reps)}</span></div></div>`).join("")}</div></div>`).join("")}
-    <div class="campo"><span class="lbl">Aplicar a um aluno</span><div class="chips">${ALUNOS.map(a => `<button type="button" class="chip" data-a="modeloPara" data-m="${id}" data-id="${a.id}">${esc(primeiro(a.nome))}</button>`).join("")}</div></div>`, true);
+  const m = todosModelos().find(x => x.id === id);
+  selModelo.clear();
+  abrirFolha(m.nome, () => `<p class="small muted">${esc(m.desc)}</p>${m.treinos.map(t => { const lg = ligacoes(t.exs); return `<div class="card flat"><b>${esc(t.letra)} · ${esc(t.nome)}</b>
+    <div class="trn">${t.exs.map((e,i) => `<div class="ex"><span class="n">${i+1}</span><div class="grow stack" style="gap:2px"><b>${esc(ex(e.id).nome)}</b><span class="small muted">${detalhes(e)}</span>${lg[i] || chipMetodo(e) ? `<span class="chips">${chipLig(lg[i])}${chipMetodo(e)}</span>` : ""}</div></div>`).join("")}</div></div>`; }).join("")}
+    <div class="campo"><span class="lbl">Aplicar pra quem? (pode marcar vários)</span><div class="chips">${ALUNOS.map(a => `<button type="button" class="chip" data-a="selModelo" data-id="${a.id}" aria-pressed="${selModelo.has(a.id)}">${esc(primeiro(a.nome))}</button>`).join("")}</div></div>
+    <button type="button" class="btn pri full" data-a="modeloPara" data-m="${id}"${selModelo.size ? "" : " disabled"}>${selModelo.size ? `Aplicar pra ${plural(selModelo.size,"aluno")}` : "Marque os alunos"}</button>
+    <p class="tiny muted">Cada um recebe o modelo com 15 dias de validade. Depois você ajusta a carga de cada um no editor.</p>`, true);
 }
 function folhaEx(id){
   const x = ex(id);
-  abrirFolha(x.nome, () => `<div class="chips"><span class="chip info">${esc(x.grupo)}</span><span class="chip">${x.local === "casa" ? "Em casa" : x.local === "livre" ? "Ao ar livre" : "Academia"}</span></div>
-    <div class="video" style="margin:0"><span class="play"></span><span>Seu vídeo gravado na academia entra aqui</span></div>
-    <div class="dica" style="margin:0"><span>💡</span><span><b>Dica pro aluno:</b> ${esc(x.dica || "—")}</span></div>
-    ${x.alt && x.alt.length ? `<div class="campo"><span class="lbl">Trocas aprovadas (aparelho ocupado)</span><div class="chips">${x.alt.map(a => `<span class="chip">${esc(ex(a).nome)}</span>`).join("")}</div></div>` : ""}`, true);
+  abrirFolha(x.nome, () => { const m = ex(id); return `<div class="chips"><span class="chip info">${esc(m.grupo)}</span><span class="chip">${m.local === "casa" ? "Em casa" : m.local === "livre" ? "Ao ar livre" : "Academia"}</span></div>
+    ${midiaEx(id)}
+    <div class="dica" style="margin:0"><span>💡</span><span><b>Dica pro aluno:</b> ${esc(m.dica || "—")}</span></div>
+    <div class="card flat"><span class="eyebrow">Demonstração</span>
+      <div class="campo"><label for="ex-yt">Link do YouTube</label><input id="ex-yt" class="inp" inputmode="url" placeholder="https://youtu.be/…" value="${esc(m.yt || "")}"></div>
+      <div class="campo"><span class="lbl">GIF ou imagem</span><label class="btn sm" style="align-self:flex-start">${m.img ? "Trocar GIF/imagem" : "Escolher GIF/imagem"}<input type="file" accept="image/*" data-in="exImg" data-id="${id}" hidden></label></div>
+      <button type="button" class="btn pri" data-a="salvarMidia" data-id="${id}">Salvar demonstração</button>
+      ${m.img || m.yt ? `<button type="button" class="lnk small" data-a="tirarMidia" data-id="${id}" style="color:var(--bad);align-self:flex-start">Tirar GIF e vídeo</button>` : ""}</div>
+    ${m.alt && m.alt.length ? `<div class="campo"><span class="lbl">Trocas aprovadas (aparelho ocupado)</span><div class="chips">${m.alt.map(a => `<span class="chip">${esc(ex(a).nome)}</span>`).join("")}</div></div>` : ""}`; }, true);
 }
 function folhaNovoEx(){
   abrirFolha("Cadastrar exercício", () => `<div class="campo"><label for="nx-nome">Nome</label><input id="nx-nome" class="inp" placeholder="Ex.: Remada cavalinho"></div>
     <div class="campo"><label for="nx-grupo">Grupo muscular</label><select id="nx-grupo" class="inp">${[...new Set(Object.values(EX).map(x => x.grupo))].map(g => `<option>${esc(g)}</option>`).join("")}</select></div>
     <div class="campo"><label for="nx-local">Onde</label><select id="nx-local" class="inp"><option value="academia">Academia</option><option value="casa">Em casa</option><option value="livre">Ao ar livre</option></select></div>
     <div class="campo"><label for="nx-dica">Dica de execução</label><textarea id="nx-dica" class="inp" placeholder="Como você explica pro aluno"></textarea></div>
-    <div class="campo"><span class="lbl">Vídeo</span><span class="ajuda">Na versão final: grava no celular e sobe direto daqui.</span></div>
+    <div class="campo"><label for="nx-yt">Link do YouTube (opcional)</label><input id="nx-yt" class="inp" inputmode="url" placeholder="https://youtu.be/…"></div>
+    <div class="campo"><span class="lbl">GIF ou imagem (opcional)</span><label class="btn sm" style="align-self:flex-start">Escolher arquivo<input type="file" accept="image/*" data-in="exImg" data-id="novo" hidden></label><span class="ajuda" id="nx-img-ok">${MIDIA_TMP.img ? "✓ imagem escolhida" : ""}</span></div>
     <button type="button" class="btn pri full" data-a="salvarEx">Salvar exercício</button>`, true);
 }
+const MIDIA_TMP = {};
 
 /* ================= JORGE · Financeiro ================= */
 function financeiro(){
@@ -1187,26 +1301,45 @@ const A = {
   edTirar(el){ ED.treinos[ED.aba].exs.splice(+el.dataset.i,1); desenharFolha(); },
   edAdd: folhaAddEx,
   grupoAdd(el){ sub.grupoAdd = el.dataset.v; desenharFolha(); },
-  edEscolher(el){ ED.treinos[ED.aba].exs.push({id:el.dataset.id, series:3, reps:"12", desc:60, carga:null, obs:""}); voltarFolha(); toast(`${ex(el.dataset.id).nome} adicionado`);
+  edEscolher(el){ const id = el.dataset.id, c = ehCardio(id), m = ex(id).grupo === "Mobilidade";
+    ED.treinos[ED.aba].exs.push({id, series: c ? 1 : 3, reps: c ? "20 min" : m ? "30s" : "12", desc: c ? 0 : m ? 15 : 60, carga:null, obs:"", cad:"", int:"", met:"Normal", jun:false});
+    voltarFolha(); toast(`${ex(id).nome} adicionado`);
     setTimeout(() => { const c = $("folha-c"); c.scrollTop = c.scrollHeight; }, 50); },
   aplicarModelo: folhaModelos,
-  edModelo(el){ const m = MODELOS.find(x => x.id === el.dataset.id); ED.treinos = clone(m.treinos); ED.programa = m.nome; ED.aba = 0; voltarFolha(); toast(`Modelo “${m.nome}” aplicado`); },
+  edModelo(el){ const m = todosModelos().find(x => x.id === el.dataset.id); ED.treinos = clone(m.treinos); ED.programa = m.nome; ED.aba = 0; voltarFolha(); toast(`Modelo “${m.nome}” aplicado`); },
+  edLigar(el){ const e = ED.treinos[ED.aba].exs[+el.dataset.i]; e.jun = !e.jun; desenharFolha(); },
+  edQuinzena: folhaQuinzena,
+  edProg(el){ aplicarProg(el.dataset.v); voltarFolha(); toast(`Quinzena nova até ${ddmm(deIso(ED.troca))}. Ajusta o que quiser e salva.`); },
+  edDuplicar(){ const t = ED.treinos[ED.aba], l = "ABCDEFGH".split("").find(x => !ED.treinos.some(z => z.letra === x)) || "X";
+    ED.treinos.push(Object.assign(clone(t), {letra:l, nome:t.nome + " (cópia)"})); ED.aba = ED.treinos.length - 1; desenharFolha(true); toast(`Treino ${t.letra} copiado como ${l}`); },
+  edComoModelo(){
+    const nome = prompt("Nome do modelo:", ED.programa + " · " + primeiro(aluno(ED.aluno).nome)); if (!nome) return;
+    S.modelosExtra.push({id:"m_" + uid(), nome:nome.trim(), desc:`${ED.treinos.length} treinos · criado a partir de ${primeiro(aluno(ED.aluno).nome)}`, treinos:clone(ED.treinos)});
+    salvar(); toast(`Modelo “${nome.trim()}” salvo. Está na aba Modelos.`); },
   edSalvar(){
     if (ED.treinos.some(t => !t.exs.length)){ toast("Tem treino sem exercício. Adiciona ou apaga ele."); return; }
-    S.treinos[ED.aluno] = ED.treinos; S.programa[ED.aluno] = ED.programa; salvar();
+    S.treinos[ED.aluno] = ED.treinos; S.programa[ED.aluno] = ED.programa; S.troca[ED.aluno] = ED.troca; salvar();
     toast(`Treino de ${primeiro(aluno(ED.aluno).nome)} atualizado. Já aparece no app.`); fecharFolha(); render();
   },
   verModelo(el){ folhaModelo(el.dataset.id); },
-  modeloPara(el){ const m = MODELOS.find(x => x.id === el.dataset.m); S.treinos[el.dataset.id] = clone(m.treinos); S.programa[el.dataset.id] = m.nome; salvar(); fecharFolha(); render();
-    toast(`${m.nome} aplicado pra ${primeiro(aluno(el.dataset.id).nome)}`); },
+  selModelo(el){ const id = el.dataset.id; selModelo.has(id) ? selModelo.delete(id) : selModelo.add(id); desenharFolha(); },
+  modeloPara(el){ if (!selModelo.size) return; const m = todosModelos().find(x => x.id === el.dataset.m), n = selModelo.size;
+    selModelo.forEach(id => { S.treinos[id] = clone(m.treinos); S.programa[id] = m.nome; S.troca[id] = iso(addDias(hoje0(), 15)); });
+    selModelo.clear(); salvar(); fecharFolha(); render(); toast(`${m.nome} aplicado pra ${plural(n,"aluno")}`); },
   grupoEx(el){ sub.grupoEx = el.dataset.v; render(); },
   verEx(el){ folhaEx(el.dataset.id); },
-  novoEx: folhaNovoEx,
+  novoEx(){ delete MIDIA_TMP.img; folhaNovoEx(); },
   salvarEx(){
     const nome = $("nx-nome").value.trim(); if (!nome){ toast("Dá um nome pro exercício"); return; }
-    S.exExtra["x_" + uid()] = {nome, grupo:$("nx-grupo").value, local:$("nx-local").value, dica:$("nx-dica").value.trim(), alt:[]};
-    salvar(); fecharFolha(); render(); toast("Exercício cadastrado ✅");
+    const yt = $("nx-yt").value.trim();
+    if (yt && !ytId(yt)){ toast("Esse link não parece do YouTube"); return; }
+    S.exExtra["x_" + uid()] = Object.assign({nome, grupo:$("nx-grupo").value, local:$("nx-local").value, dica:$("nx-dica").value.trim(), alt:[]}, yt ? {yt} : {}, MIDIA_TMP.img ? {img:MIDIA_TMP.img} : {});
+    delete MIDIA_TMP.img; salvar(); fecharFolha(); render(); toast("Exercício cadastrado ✅");
   },
+  salvarMidia(el){ const id = el.dataset.id, yt = $("ex-yt").value.trim();
+    if (yt && !ytId(yt)){ toast("Esse link não parece do YouTube"); return; }
+    S.midia[id] = Object.assign({}, S.midia[id], {yt}); salvar(); desenharFolha(); render(); toast("Demonstração salva ✅"); },
+  tirarMidia(el){ delete S.midia[el.dataset.id]; const x = S.exExtra[el.dataset.id]; if (x){ delete x.img; delete x.yt; } salvar(); desenharFolha(); render(); },
   pago(el){ const id = el.dataset.id, v = deIso(S.venc[id]); S.venc[id] = iso(addDias(v, 30)); S.pagos[id] = iso(hoje0()); salvar(); render();
     toast(`${primeiro(aluno(id).nome)}: pago! Próximo vencimento ${ddmm(addDias(v,30))}`); },
   recado: folhaRecado,
@@ -1232,11 +1365,27 @@ document.addEventListener("input", e => {
   else if (t === "edNome"){ ED.treinos[ED.aba].nome = el.value; }
   else if (t === "ed"){
     const x = ED.treinos[ED.aba].exs[+el.dataset.i], c = el.dataset.c;
-    x[c] = c === "reps" || c === "obs" ? el.value : c === "carga" ? numIn(el.value) : (parseInt(el.value) || 0);
+    x[c] = ["reps","obs","cad","int","met"].includes(c) ? el.value : c === "carga" ? numIn(el.value) : (parseInt(el.value) || 0);
+    if (c === "met") desenharFolha();
   }
 });
 document.addEventListener("change", e => {
   const el = e.target;
+  /* GIF/imagem do exercício: guarda o arquivo como está (GIF continua animado) */
+  if (el.dataset && el.dataset.in === "exImg" && el.files && el.files[0]){
+    const f = el.files[0];
+    if (f.size > 1.5e6){ toast("Arquivo grande demais pro protótipo (máx. 1,5 MB)"); return; }
+    const fr = new FileReader();
+    fr.onload = () => {
+      const id = el.dataset.id;
+      if (id === "novo"){ MIDIA_TMP.img = fr.result; const o = $("nx-img-ok"); if (o) o.textContent = "✓ imagem escolhida"; return; }
+      if (S.exExtra[id]) S.exExtra[id].img = fr.result; else S.midia[id] = Object.assign({}, S.midia[id], {img: fr.result});
+      try { salvar(); } catch(err){}
+      desenharFolha(); render(); toast("GIF/imagem salvo ✅");
+    };
+    fr.readAsDataURL(f);
+    return;
+  }
   if (el.dataset && el.dataset.in === "foto" && el.files && el.files[0]){
     const fr = new FileReader();
     fr.onload = () => {

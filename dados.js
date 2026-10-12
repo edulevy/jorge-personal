@@ -76,35 +76,57 @@ const EX = {
 
   prancha:            {nome:"Prancha", grupo:"Core", local:"casa", dica:"Glúteo contraído, não deixa o quadril cair.", alt:["dead_bug"]},
   dead_bug:           {nome:"Dead bug", grupo:"Core", local:"casa", dica:"Lombar colada no chão enquanto estica braço e perna opostos.", alt:["prancha"]},
-  abd_infra:          {nome:"Abdominal infra", grupo:"Core", local:"casa", dica:"Sobe o quadril do chão, sem embalo.", alt:["dead_bug"]}
+  abd_infra:          {nome:"Abdominal infra", grupo:"Core", local:"casa", dica:"Sobe o quadril do chão, sem embalo.", alt:["dead_bug"]},
+
+  rodagem:            {nome:"Corrida contínua (rodagem)", grupo:"Corrida", local:"livre", dica:"Ritmo confortável: dá pra falar frases curtas.", alt:["esteira_corrida"]},
+  intervalado:        {nome:"Corrida intervalada", grupo:"Corrida", local:"livre", dica:"No forte, ritmo de prova de 5 km. No leve, trote bem solto.", alt:["tiros"]},
+  longao:             {nome:"Longão", grupo:"Corrida", local:"livre", dica:"Devagar e constante. O objetivo é tempo em pé, não velocidade.", alt:["rodagem"]},
+  esteira_corrida:    {nome:"Corrida na esteira", grupo:"Corrida", local:"academia", dica:"Inclinação 1% pra imitar a rua.", alt:["rodagem"]},
+
+  mob_quadril:        {nome:"Mobilidade de quadril 90/90", grupo:"Mobilidade", local:"casa", dica:"Sentado no chão, joelhos a 90°. Gira o quadril de um lado pro outro sem usar as mãos.", alt:["alonga_flexor"]},
+  mob_toracica:       {nome:"Rotação torácica no chão", grupo:"Mobilidade", local:"casa", dica:"Deitado de lado, joelhos dobrados. Abre o braço de cima acompanhando com o olhar.", alt:["gato_vaca"]},
+  gato_vaca:          {nome:"Gato e vaca", grupo:"Mobilidade", local:"casa", dica:"De quatro apoios, arredonda e estende a coluna devagar, com a respiração.", alt:["mob_toracica"]},
+  mob_tornozelo:      {nome:"Mobilidade de tornozelo na parede", grupo:"Mobilidade", local:"casa", dica:"Joelho vai em direção à parede sem tirar o calcanhar do chão.", alt:["mob_quadril"]},
+  alonga_flexor:      {nome:"Alongamento de flexor do quadril", grupo:"Mobilidade", local:"casa", dica:"Joelho de trás no chão, contrai o glúteo e leva o quadril à frente.", alt:["mob_quadril"]},
+  alonga_posterior:   {nome:"Alongamento de posterior de coxa", grupo:"Mobilidade", local:"casa", dica:"Perna estendida no apoio, inclina o tronco com a coluna reta.", alt:["alonga_flexor"]}
 };
 
-/* exercício do treino: [id, séries, reps, descanso (s), carga sugerida (kg) ou null, observação] */
-const e = (id, series, reps, desc, carga, obs) => ({id, series, reps, desc, carga: carga ?? null, obs: obs || ""});
+/* métodos (intensificação). Bi-set/tri-set é o botão 🔗 "junta com o próximo" no editor */
+const METODOS = ["Normal","Drop-set","Rest-pause","Pirâmide","Cluster","FST-7","Isometria","Parciais","Negativa"];
+
+/* exercício do treino: [id, séries, reps, descanso (s), carga sugerida (kg) ou null, observação, extra]
+   extra: cad (cadência: descida-pausa-subida-pausa), int (RIR/RPE, ou zona/ritmo no cardio), met (método), jun (junta com o próximo: bi-set) */
+const e = (id, series, reps, desc, carga, obs, x) => Object.assign({id, series, reps, desc, carga: carga ?? null, obs: obs || "", cad:"", int:"", met:"Normal", jun:false}, x || {});
 
 const T_MARINA = [
   {letra:"A", nome:"Inferior · quadríceps", local:"academia", exs:[
-    e("agachamento",4,"8–10",90,40,"Aquecimento: 2 séries leves antes."),
-    e("leg_press",3,"12",90,120),
-    e("afundo",3,"10 cada",75,10,"Carga em cada mão."),
-    e("extensora",3,"12–15",60,35),
-    e("panturrilha",4,"15",45,30),
+    e("agachamento",4,"8–10",90,40,"Aquecimento: 2 séries leves antes.",{cad:"3-1-1-0", int:"RIR 2"}),
+    e("leg_press",3,"12",90,120,"",{cad:"3-0-1-0", int:"RIR 2"}),
+    e("afundo",3,"10 cada",75,10,"Carga em cada mão.",{int:"RIR 2"}),
+    e("extensora",3,"12–15",60,35,"Na última série: tira 30% da carga e vai até a falha.",{cad:"2-0-1-1", int:"RIR 1", met:"Drop-set"}),
+    e("panturrilha",4,"15",45,30,"",{cad:"2-2-1-1", int:"RIR 1"}),
     e("prancha",3,"40s",45,null)]},
   {letra:"B", nome:"Superior · peito, costas e braços", local:"academia", exs:[
-    e("supino_inclinado",4,"10",90,14,"Carga em cada mão."),
-    e("puxada_frente",4,"10",90,40),
-    e("remada_baixa",3,"12",75,35),
-    e("elevacao_lateral",3,"15",45,6,"Ombro direito: para se doer. Se doer, troca pela polia."),
-    e("face_pull",3,"15",45,15),
-    e("triceps_corda",3,"12",45,20),
-    e("rosca_direta",3,"12",45,16)]},
+    e("supino_inclinado",4,"10",90,14,"Carga em cada mão.",{cad:"3-0-1-0", int:"RIR 2"}),
+    e("puxada_frente",4,"10",90,40,"",{cad:"2-0-1-1", int:"RIR 2"}),
+    e("remada_baixa",3,"12",75,35,"",{int:"RIR 2"}),
+    e("elevacao_lateral",3,"15",45,6,"Ombro direito: para se doer. Se doer, troca pela polia.",{int:"RIR 1"}),
+    e("face_pull",3,"15",45,15,"",{cad:"2-0-1-2", int:"RIR 2"}),
+    e("triceps_corda",3,"12",0,20,"",{int:"RIR 1", jun:true}),
+    e("rosca_direta",3,"12",60,16,"",{int:"RIR 1"})]},
   {letra:"C", nome:"Inferior · posterior e glúteo", local:"academia", exs:[
-    e("stiff",4,"10",90,14,"Carga em cada mão."),
-    e("elevacao_pelvica",4,"10",90,60),
-    e("mesa_flexora",3,"12",60,30),
-    e("bulgaro",3,"10 cada",75,8),
-    e("abdutora",3,"15",45,45),
-    e("dead_bug",3,"10 cada",45,null)]}
+    e("stiff",4,"10",90,14,"Carga em cada mão.",{cad:"3-1-1-0", int:"RIR 2"}),
+    e("elevacao_pelvica",4,"10",90,60,"",{cad:"2-0-1-2", int:"RIR 1"}),
+    e("mesa_flexora",3,"12",60,30,"",{int:"RIR 2"}),
+    e("bulgaro",3,"10 cada",75,8,"",{int:"RIR 2"}),
+    e("abdutora",3,"15",45,45,"Faz 15, descansa 15 segundos e faz mais o que der.",{int:"RIR 0", met:"Rest-pause"}),
+    e("dead_bug",3,"10 cada",45,null)]},
+  {letra:"D", nome:"Corrida e mobilidade", local:"livre", exs:[
+    e("mob_tornozelo",2,"10 cada",0,null,"",{jun:true}),
+    e("mob_quadril",2,"8 cada",30,null),
+    e("rodagem",1,"25 min",0,null,"Se a canela incomodar, troca pela esteira.",{int:"Zona 2 · conversa ok"}),
+    e("alonga_posterior",2,"30s",15,null),
+    e("alonga_flexor",2,"30s cada",15,null)]}
 ];
 
 const T_CASA = {letra:"Casa", nome:"Em casa · sem equipamento", local:"casa", circuito:true, exs:[
@@ -193,5 +215,5 @@ const DORES = [
   {dor:"Paga por aluno, todo mês", porque:"Plataformas cobram mensalidade que cresce com o número de alunos, e os dados ficam nelas.", aqui:"Custo fixo de infraestrutura, e os dados dos alunos são do Jorge."}
 ];
 
-return {MARCA, EX, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
+return {MARCA, EX, METODOS, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
 })();

@@ -411,3 +411,28 @@ img.midia{display:block;width:100%;max-height:320px;object-fit:contain;border-ra
 .tab-av td.ok{color:var(--ok);font-weight:800} .tab-av td.bad{color:var(--bad);font-weight:800}
 .fotos-av{display:flex;flex-direction:column;gap:10px}
 .fotos-av .foto{flex:1}
+
+/* chat */
+.chat{display:flex;flex-direction:column;gap:10px;padding-bottom:6px}
+.chat .msg .b{white-space:pre-wrap;word-break:break-word}
+.chat-dia{align-self:center;font-size:.7rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:6px 0}
+.chat-in{position:sticky;bottom:calc(var(--tabh) + env(safe-area-inset-bottom) + 4px);display:flex;gap:8px;align-items:flex-end;padding:10px 0 4px;background:var(--bg)}
+.folha .chat-in{bottom:0;background:var(--surface)}
+.chat-in textarea{flex:1;min-height:44px;max-height:120px;resize:none}
+.chat-in .btn{flex:none;width:48px;padding:0}
+/* Pix */
+.qr-box{display:flex;flex-direction:column;align-items:center;gap:6px}
+.qr{width:180px;height:180px;background:#fff;border-radius:12px;padding:4px}
+.qr rect{fill:#111}
+/* interruptor */
+.sw{flex:none;width:44px;height:26px;border-radius:13px;background:var(--line);position:relative;transition:background .2s}
+.sw i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}
+.sw.on{background:var(--ok)} .sw.on i{left:21px}
+/* notificação de exemplo (imita o aviso do celular) */
+.notif{position:fixed;left:12px;right:12px;top:calc(env(safe-area-inset-top) + 10px);z-index:95;display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:18px;
+  background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 30px rgba(0,0,0,.25);
+  transform:translateY(-140%);visibility:hidden;transition:transform .3s,visibility 0s .3s;max-width:460px;margin:0 auto}
+.notif.on{transform:none;visibility:visible;transition:transform .3s}
+.notif .logo.sm{width:38px;height:38px;border-radius:10px;font-size:.8rem}
+/* alimentação */
+.orient{margin:10px 0 0;padding-left:1.2em;display:flex;flex-direction:column;gap:5px}

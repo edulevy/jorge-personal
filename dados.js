@@ -235,6 +235,15 @@ const PENDENTES = [
    dias:"Seg, ter, qui e sex à noite", diasAtras:1}
 ];
 
+/* orientações gerais de alimentação do Jorge (dieta individual é com o nutricionista parceiro) */
+const ORIENT = [
+  "Proteína em todas as refeições (carne, frango, peixe, ovo ou laticínio)",
+  "Uns 2,5 litros de água por dia",
+  "Prato com metade de legumes e verduras",
+  "Refeição com carboidrato 1 a 2 horas antes do treino",
+  "Dormir 7 horas ou mais: é quando o músculo se recupera"
+].join("\n");
+
 const RECADO = "Semana de subir carga no agachamento! Se as 4 séries saírem limpas, sobe 2,5 kg na próxima. Qualquer dor no ombro, me avisa antes de continuar.";
 
 /* dores do mercado (base da tela "Por que um app só seu") */
@@ -250,5 +259,5 @@ const DORES = [
   {dor:"Paga por aluno, todo mês", porque:"Plataformas cobram mensalidade que cresce com o número de alunos, e os dados ficam nelas.", aqui:"Custo fixo de infraestrutura, e os dados dos alunos são do Jorge."}
 ];
 
-return {MARCA, EX, METODOS, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
+return {MARCA, EX, METODOS, ORIENT, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
 })();

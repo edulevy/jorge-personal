@@ -51,19 +51,20 @@ const ICON = {
   alunos:'<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6"/>',
   grana:'<path d="M12 2.5v19M16.5 6.5c-.9-1.3-2.5-2-4.5-2-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.5 2.6 9.5 7.6 0 2-1.9 3.5-5 3.5-2.3 0-4.2-.8-5.1-2.4"/>',
   ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  chat:'<path d="M4 5h16v11H9l-5 4z"/>',
   perfil:'<path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM4 21v-1a8 8 0 0 1 16 0v1"/>'
 };
 const svg = (k, cls="") => `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true">${ICON[k]}</svg>`;
 
 /* ================= estado ================= */
-const CHAVE = "jorge-personal:v4";
+const CHAVE = "jorge-personal:v5";
 let S;
 
 function carregar(){
   try {
     const s = JSON.parse(store.get(CHAVE));
     /* demonstração "envelhecida" (aberta muitos dias depois): recomeça com datas novas */
-    if (s && s.v === 4 && diasDesde(s.semente) < 5) return s;
+    if (s && s.v === 5 && diasDesde(s.semente) < 5) return s;
   } catch(e){}
   return null;
 }
@@ -115,12 +116,25 @@ const gruposDe = t => [...new Set(t.exs.map(e => ex(e.id).grupo).filter(g => g &
 
 function semear(){
   const h = hoje0(), r = rng(20261009);
-  const s = {v:4, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], avals:{}, treinos:{}, programa:{},
+  const s = {v:5, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], avals:{}, treinos:{}, programa:{},
     venc:{}, pagos:{}, exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2)),
     /* cadastro: o aluno se inscreve e o Jorge aprova */
     pendentes: D.PENDENTES.map(p => Object.assign({}, p, {data: iso(addDias(h, -p.diasAtras)), termo: iso(addDias(h, -p.diasAtras))})),
     novos:[], suspensos:{}, exclusao:[], meuCadastro:null,
-    termoAceito: iso(addDias(h, -240))};
+    termoAceito: iso(addDias(h, -240)),
+    chat:{}, comprovantes:[], avisos:{treino:true, hora:"06:00", novo:true, venc:true, msg:true}, nutri:{}, planosAtivos:{mensal:true}};
+  /* conversas de exemplo no chat do app */
+  const ts = (dias, hh, mm) => { const d = addDias(h, -dias); d.setHours(hh, mm); return Math.min(d.getTime(), Date.now() - 6e4); };
+  const conv = {
+    marina:[["a","Jorge, o ombro deu uma incomodada na elevação lateral hoje",23,7,12],["j","Troca pela polia nas próximas semanas. Se doer na polia também, me avisa antes de continuar.",23,9,40],
+      ["a","Fiz na polia, zero dor 🙌",21,7,5],["j","Perfeito! Segue assim.",21,8,0],["a","Agachamento saiu muito bem hoje!",9,7,30],["j","Isso! Semana que vem sobe 2,5 kg se as 4 séries saírem limpas 💪",9,12,10]],
+    rafael:[["a","Campeonato daqui a 3 semanas, dá pra ajustar o treino?",1,19,22]],
+    diego:[["a","Lombar travou no terra quinta. Tô evitando.",1,21,3]],
+    aline:[["a","Primeira semana sem dor nas costas desde o parto! 🙌",2,10,15],["j","Que notícia boa, Aline! Mantém o ritmo.",2,11,0]],
+    camila:[["a","Glúteo respondendo muito, já vejo diferença na calça.",4,20,0],["j","É o trabalho aparecendo! 🔥",4,20,30]]
+  };
+  Object.entries(conv).forEach(([id, ms]) => { s.chat[id] = ms.map(([de, txt, d, hh, mm], i) => ({de, txt, ts:ts(d, hh, mm), lido: !(id === "rafael" || id === "diego")})); });
+  s.nutri.marina = {orient:D.ORIENT, nutri:"Dra. Ana Lima · CRN 4 00000 (fictícia)", pdf:{nome:"Plano alimentar · Marina.pdf", src:null}};
   /* troca quinzenal: cada aluno numa altura da quinzena (alguns já passaram da data) */
   ALUNOS.forEach((a, i) => { s.venc[a.id] = iso(addDias(h, a.venc)); s.troca[a.id] = iso(addDias(h, a.id === "marina" ? 9 : (i*5) % 17 - 2)); });
 
@@ -221,8 +235,8 @@ function sequenciaSemanas(id){
 function msgCobranca(a, dias){
   const p = primeiro(a.nome);
   return dias < 0
-    ? `Oi ${p}, tudo bem? Passando pra lembrar que a mensalidade da consultoria (${reais(a.valor)}) venceu em ${ddmm(deIso(S.venc[a.id]))}. Segue a chave Pix: ${MARCA.pix}. Qualquer coisa me fala! 💪`
-    : `Oi ${p}! Sua mensalidade (${reais(a.valor)}) vence ${dias === 0 ? "hoje" : "dia " + ddmm(deIso(S.venc[a.id]))}. Chave Pix: ${MARCA.pix}. Obrigado pela confiança, bora pra mais um mês! 💪`;
+    ? `Oi ${p}, tudo bem? Passando pra lembrar que a mensalidade (${reais(a.valor)}) venceu em ${ddmm(deIso(S.venc[a.id]))}. Dá pra pagar pelo app: Perfil → Pagar. Qualquer coisa me fala! 💪`
+    : `Oi ${p}! Sua mensalidade (${reais(a.valor)}) vence ${dias === 0 ? "hoje" : "dia " + ddmm(deIso(S.venc[a.id]))}. O Pix tá no app, em Perfil → Pagar. Bora pra mais um mês! 💪`;
 }
 function alertas(){
   const out = [];
@@ -314,8 +328,8 @@ function telaEntrada(){
 
 /* ================= abas ================= */
 const ABAS = {
-  aluno: [["hoje","Hoje","casa"],["treinos","Treinos","peso"],["perfil","Perfil","perfil"]],
-  jorge: [["painel","Painel","painel"],["alunos","Alunos","alunos"],["montar","Treinos","peso"],["financeiro","Financeiro","grana"]]
+  aluno: [["hoje","Hoje","casa"],["treinos","Treinos","peso"],["chat","Chat","chat"],["perfil","Perfil","perfil"]],
+  jorge: [["painel","Painel","painel"],["alunos","Alunos","alunos"],["montar","Treinos","peso"],["chat","Chat","chat"],["financeiro","Financeiro","grana"]]
 };
 const sub = {};  // sub-abas (segmentos) de cada tela
 const EU = "marina";
@@ -327,10 +341,12 @@ function render(){
   const p = S.papel, aba = S.aba[p];
   $("top-logo").textContent = MARCA.iniciais;
   $("troca-txt").textContent = p === "aluno" ? "Marina" : "Jorge";
-  const badge = {painel: (S.pendentes.length + S.exclusao.filter(x => !x.feito).length) || ""};
+  const badge = {painel: (S.pendentes.length + S.exclusao.filter(x => !x.feito).length) || "",
+    chat: (p === "aluno" ? naoLidas(EU, "a") : ALUNOS.reduce((m,a) => m + naoLidas(a.id, "j"), 0)) || "",
+    financeiro: S.comprovantes.filter(c => !c.ok).length || ""};
   $("tabbar").innerHTML = ABAS[p].map(([id, nome, ic]) =>
     `<button type="button" data-a="aba" data-v="${id}"${id === aba ? ' aria-current="page"' : ""}>${svg(ic)}<span>${nome}</span>${badge[id] ? `<b class="dot">${badge[id]}</b>` : ""}</button>`).join("");
-  const V = {hoje:vHoje, treinos:vTreinos, perfil:vPerfil, painel:vPainel, alunos:vAlunos, montar:vMontar, financeiro:vFinanceiro}[aba] || (S.aba[p] = ABAS[p][0][0], vHoje);
+  const V = {hoje:vHoje, treinos:vTreinos, perfil:vPerfil, chat: p === "aluno" ? vChatAluno : vChatJorge, painel:vPainel, alunos:vAlunos, montar:vMontar, financeiro:vFinanceiro}[aba] || (S.aba[p] = ABAS[p][0][0], vHoje);
   const r = V();
   $("top-sub").textContent = r.sub; $("top-tit").textContent = r.tit;
   $("tela").innerHTML = r.html;
@@ -368,7 +384,7 @@ function vHoje(){
   }
   const dots = SEM.map((n,i) => `<span class="d${feitos.has(i) ? " feito" : ""}${i === dow(h) ? " hoje" : ""}"><i>${feitos.has(i) ? svg("ok").replace('viewBox','style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3" viewBox') : n[0]}</i>${n}</span>`).join("");
   const v = diasAteVenc(EU);
-  const html = `
+  const html = `${S.suspensos[EU] ? `<div class="demo" style="border-color:var(--bad);background:var(--bad-soft)"><span>⏸️</span><span><b>Acesso pausado pelo ${esc(MARCA.curto)}.</b> Regulariza a mensalidade em Perfil → Pagar, ou fala com ele no chat.</span></div>` : ""}
     <div class="card">
       <div class="row sb"><b>Sua semana</b><span class="chip ${ses.length >= a.meta ? "ok" : "acc"}">${ses.length} de ${a.meta} treinos</span></div>
       <div class="semana">${dots}</div>
@@ -383,8 +399,9 @@ function vHoje(){
     <div class="card">
       <div class="row sb"><span class="eyebrow">Recado do ${esc(MARCA.curto)} · ${quando(S.recadoData)}</span></div>
       <div class="recado"><span class="logo sm">${esc(MARCA.iniciais)}</span><p class="bolha">${esc(S.recado)}</p></div>
-      <a class="lnk small" href="${wa("Oi Jorge! Sobre o recado: ")}" target="_blank" rel="noopener">Responder no WhatsApp ›</a>
+      <button type="button" class="lnk small" data-a="aba" data-v="chat" style="align-self:flex-start">Responder no chat ›</button>
     </div>
+    ${cardNutri(EU)}
     <div class="card row flat">
       <span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span>
       <span class="grow"><b>Plano mensal · ${reais(a.valor)}</b><br><span class="small muted">${v < 0 ? `Venceu há ${plural(-v,"dia")}` : v === 0 ? "Vence hoje" : `Vence em ${plural(v,"dia")} (${ddmm(deIso(S.venc[EU]))})`}</span></span>
@@ -624,6 +641,9 @@ function vPerfil(){
     <div class="card row flat"><span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span>
       <span class="grow"><b>Plano mensal · ${reais(a.valor)}</b><br><span class="small muted">${v < 0 ? `Venceu há ${plural(-v,"dia")}` : v === 0 ? "Vence hoje" : `Próximo vencimento ${ddmm(deIso(S.venc[EU]))}`}</span></span>
       <button type="button" class="btn sm" data-a="pix">Pagar</button></div>
+    ${PLANOS.filter(pl => pl.id !== "mensal" && S.planosAtivos[pl.id]).map(pl => `<div class="card row flat"><span class="ic acc">⭐</span><span class="grow"><b>${pl.nome}: ${reais(pl.valor)}</b><br><span class="small muted">Sai ${reais(Math.round(pl.valor/pl.meses))} por mês. Fala com o ${esc(MARCA.curto)} pra trocar.</span></span></div>`).join("")}
+    <div class="sec"><h2>Avisos no celular</h2></div>
+    ${htmlAvisos()}
     <div class="sec"><h2>Meus documentos</h2></div>
     <div class="lista">
       <button type="button" class="it" data-a="verTermo"><span class="ic ok">✅</span><span class="grow stack" style="gap:1px"><span class="t">Termo de consentimento</span><span class="s">Aceito em ${ddmm(deIso(S.termoAceito))}/${deIso(S.termoAceito).getFullYear()}</span></span><span class="seta">›</span></button>
@@ -960,7 +980,7 @@ function folhaResumo(x){
     ${x.prs.map(id => `<div class="recorde"><span>🏆</span><span>Recorde pessoal no <b>${esc(ex(id).nome)}</b></span></div>`).join("")}
     <div class="card row flat"><span class="ic ${nSem >= meta ? "ok" : "acc"}">📅</span><span class="grow"><b>${nSem} de ${meta} treinos na semana</b><br><span class="small muted">${nSem >= meta ? "Meta da semana batida! 🎉" : `Faltam ${meta - nSem} pra bater a meta.`}</span></span></div>
     <div class="demo"><span>📲</span><span>O ${esc(MARCA.curto)} já recebeu esse treino no painel dele${x.dor ? ", com o alerta de dor" : ""}. Troque pro perfil dele (lá em cima) pra ver.</span></div>
-    <a class="btn wa full" href="${wa(txt)}" target="_blank" rel="noopener">Mandar resumo no WhatsApp</a>
+    <button type="button" class="btn full" data-a="irChat">Mandar recado pro ${esc(MARCA.curto)} no chat</button>
     <button type="button" class="btn full" data-a="fechar">Fechar</button>`, true);
 }
 
@@ -983,7 +1003,7 @@ function vPainel(){
     ${al.length ? `<div class="lista">${al.slice(0, sub.verTodosAl ? 99 : 6).map(x => `<div class="it">
       <button type="button" class="row grow" data-a="verAluno" data-id="${x.a.id}" style="border:0;background:none;padding:0;text-align:left">
         <span class="ic ${x.cls}">${x.ic}</span><span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.a.nome)}</span><span class="s">${esc(x.t)}</span></span></button>
-      <a class="btn wa sm" href="${wa(x.msg)}" target="_blank" rel="noopener" aria-label="Mandar mensagem no WhatsApp">WhatsApp</a></div>`).join("")}</div>
+      <button type="button" class="btn sm" data-a="msgAlerta" data-id="${x.a.id}">Mensagem</button></div>`).join("")}</div>
       ${al.length > 6 && !sub.verTodosAl ? `<button type="button" class="lnk small" data-a="verTodosAl" style="align-self:flex-start">Ver todos (${al.length})</button>` : ""}` : `<div class="vazio">Tudo em ordem por aqui 👌</div>`}
     ${pend.length ? `<div class="sec"><h2>Cadastros pra aprovar</h2><span class="chip acc">${pend.length}</span></div>
     <div class="lista">${pend.map(c => `<button type="button" class="it" data-a="verPendente" data-id="${c.id}">${avatar({id:c.id, nome:c.nome})}
@@ -1036,20 +1056,140 @@ function folhaAluno(id){
     return `<div class="row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><span class="small muted">${a.idade} anos · aluno há ${plural(a.desde,"mês","meses")}</span>
         <div class="chips"><span class="chip info">${esc(a.tipo)}</span><span class="chip ${c}">treino ${t}</span></div></div></div>
       ${al.map(x => `<div class="demo" style="border-color:var(--${x.cls === "bad" ? "bad" : "warn"});background:var(--${x.cls === "bad" ? "bad" : "warn"}-soft)"><span>${x.ic}</span><span>${esc(x.t)}</span></div>`).join("")}
-      <div class="btns"><a class="btn wa" href="${wa(`Oi ${primeiro(a.nome)}! `)}" target="_blank" rel="noopener">WhatsApp</a><button type="button" class="btn" data-a="editarTreino" data-id="${id}">Editar treino</button></div>
+      <div class="btns"><button type="button" class="btn" data-a="abrirChat" data-id="${id}">💬 Mensagem</button><button type="button" class="btn" data-a="editarTreino" data-id="${id}">Editar treino</button></div>
       <div class="card flat"><span class="eyebrow">Objetivo</span><b>${esc(a.objetivo)}</b>
         ${a.restricao ? `<p class="small" style="color:var(--warn)">📌 ${esc(a.restricao)}</p>` : ""}${a.nota ? `<p class="small muted">📝 ${esc(a.nota)}</p>` : ""}
         <p class="small muted">Programa: <b style="color:var(--ink)">${esc(programaDe(id))}</b> · meta ${a.meta}x por semana</p></div>
       <div class="card flat"><span class="eyebrow">Frequência · últimas 4 semanas</span>
         ${semanas.map(s => `<div class="row"><span class="small" style="width:92px">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `Há ${s.w} semanas`}</span><span class="bar grow"><i style="width:${Math.min(100, s.n/a.meta*100)}%;--c:${s.n >= a.meta ? "var(--ok)" : s.w === 0 ? "var(--accent)" : "var(--warn)"}"></i></span><span class="small mono" style="width:30px;text-align:right">${s.n}/${a.meta}</span></div>`).join("")}</div>
-      <div class="btns"><button type="button" class="btn" data-a="verEvolucao" data-id="${id}">📈 Evolução</button><button type="button" class="btn" data-a="verFicha" data-id="${id}">🩺 Ficha</button></div>
+      <div class="btns"><button type="button" class="btn" data-a="verEvolucao" data-id="${id}">📈 Evolução</button><button type="button" class="btn" data-a="verFicha" data-id="${id}">🩺 Ficha</button><button type="button" class="btn" data-a="verNutri" data-id="${id}">🥗</button></div>
       ${cardAval(id)}
       <div class="sec"><h2>Últimos treinos</h2></div>
       <div class="lista">${sessoesDe(id).slice(-5).reverse().map(x => `<button type="button" class="it" data-a="verSessao" data-id="${x.id}"><span class="letra-b" style="width:34px;height:34px;font-size:.85rem">${esc(x.letra)}</span>
         <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.nome)}</span><span class="s ellip">${x.coment ? "“" + esc(x.coment) + "”" : `esforço ${x.rpe}/10 · ${x.dur} min`}</span></span><span class="r"><span class="tiny muted">${quando(x.data)}</span>${x.dor ? `<span class="chip bad">dor</span>` : ""}</span></button>`).join("")}</div>
       <div class="card row flat"><span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span><span class="grow"><b>${reais(a.valor)}/mês</b><br><span class="small muted">${v < 0 ? `Atrasado há ${plural(-v,"dia")}` : `Vence ${ddmm(deIso(S.venc[id]))}`}</span></span>
-        ${v <= 7 ? `<a class="btn sm" href="${wa(msgCobranca(a, v))}" target="_blank" rel="noopener">Cobrar</a>` : ""}</div>`;
+        ${v <= 7 ? `<button type="button" class="btn sm" data-a="cobrar" data-id="${id}">Cobrar</button>` : ""}</div>
+      <button type="button" class="lnk small" data-a="suspender" data-id="${id}" style="align-self:center;color:var(--${S.suspensos[id] ? "ok" : "bad"})">${S.suspensos[id] ? "Reativar acesso" : "Suspender acesso (falta de pagamento)"}</button>`;
   }, true);
+}
+
+/* ================= Chat (no lugar do WhatsApp) ================= */
+const conversa = id => S.chat[id] || (S.chat[id] = []);
+const naoLidas = (id, quem) => conversa(id).filter(m => m.de !== quem && !m.lido).length;
+function htmlConversa(id, eu){
+  const c = conversa(id), a = aluno(id);
+  if (!c.length) return `<div class="vazio">Nenhuma mensagem ainda. Manda a primeira 👋</div>`;
+  let dia = "";
+  return `<div class="chat">${c.map(m => { const d = new Date(m.ts), k = iso(d), sep = k !== dia ? (dia = k, `<span class="chat-dia">${quando(k)}</span>`) : "";
+    return sep + `<div class="msg ${m.de === eu ? "eu" : "ele"}"><div class="b">${esc(m.txt)}</div><span class="q">${hora(m.ts)}${m.de === eu && m.lido ? " · lida" : ""}</span></div>`; }).join("")}</div>`;
+}
+function caixaChat(id, rascunho = ""){
+  return `<div class="chat-in"><textarea class="inp" id="chat-txt" rows="1" placeholder="Mensagem…">${esc(rascunho)}</textarea>
+    <button type="button" class="btn pri" data-a="enviarChat" data-id="${id}" aria-label="Enviar">➤</button></div>`;
+}
+function lerConversa(id, quem){ conversa(id).forEach(m => { if (m.de !== quem) m.lido = true; }); salvar(); }
+function rolarChat(){
+  const ir = () => { const c = pilha.length ? $("folha-c") : $("main"); if (c) c.scrollTop = c.scrollHeight; };
+  requestAnimationFrame(ir); setTimeout(ir, 120);
+}
+function vChatAluno(){
+  lerConversa(EU, "a");
+  rolarChat();
+  return {sub:`Fala direto com o ${MARCA.curto}`, tit:"Chat", html: htmlConversa(EU, "a") + caixaChat(EU)};
+}
+function vChatJorge(){
+  const ids = ALUNOS.map(a => a.id).filter(id => conversa(id).length)
+    .sort((x,y) => conversa(y)[conversa(y).length-1].ts - conversa(x)[conversa(x).length-1].ts);
+  const html = `<div class="lista">${ids.map(id => { const a = aluno(id), u = conversa(id)[conversa(id).length-1], n = naoLidas(id, "j");
+    return `<button type="button" class="it" data-a="abrirChat" data-id="${id}">${avatar(a)}
+      <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(a.nome)}</span><span class="s ellip"${n ? ' style="color:var(--ink);font-weight:700"' : ""}>${u.de === "j" ? "Você: " : ""}${esc(u.txt)}</span></span>
+      <span class="r"><span class="tiny muted">${quando(iso(new Date(u.ts)))}</span>${n ? `<b class="dot" style="position:static">${n}</b>` : ""}</span></button>`; }).join("") || `<div class="vazio">Nenhuma conversa ainda.</div>`}</div>
+    <button type="button" class="btn full" data-a="novaConversa">+ Nova mensagem</button>`;
+  return {sub:"Mensagens dos alunos", tit:"Chat", html};
+}
+function folhaChat(id, rascunho){
+  lerConversa(id, "j");
+  abrirFolha(aluno(id).nome, () => htmlConversa(id, "j") + caixaChat(id, folhaChat.rasc || ""), !pilha.length);
+  folhaChat.rasc = ""; rolarChat();
+  if (rascunho){ const t = $("chat-txt"); t.value = rascunho; t.focus(); }
+}
+
+/* ================= Pix com comprovante ================= */
+/* QR desenhado só pra ilustrar: na versão final vem do banco/gateway (Pix com valor certo) */
+function qrFake(txt){
+  const n = 25; let h = 7; for (const c of txt) h = (h*33 + c.charCodeAt(0)) >>> 0;
+  const r = rng(h), q = []; for (let y = 0; y < n; y++) for (let x = 0; x < n; x++){
+    const canto = (a, b) => x >= a && x < a + 7 && y >= b && y < b + 7;
+    const fin = canto(0,0) || canto(n-7,0) || canto(0,n-7);
+    const on = fin ? (() => { const a = x < 7 ? 0 : n-7, b = y < 7 ? 0 : n-7, dx = x - a, dy = y - b; return dx === 0 || dx === 6 || dy === 0 || dy === 6 || (dx > 1 && dx < 5 && dy > 1 && dy < 5); })() : r() > .5;
+    if (on) q.push(`<rect x="${x}" y="${y}" width="1" height="1"/>`);
+  }
+  return `<svg class="qr" viewBox="-2 -2 ${n+4} ${n+4}" role="img" aria-label="QR code do Pix">${q.join("")}</svg>`;
+}
+const copiaCola = a => `00020126580014BR.GOV.BCB.PIX0136${MARCA.pix}5204000053039865406${a.valor.toFixed(2)}5802BR5913JORGE BUNN6014RIO DE JANEIRO62070503***6304ABCD`;
+function folhaPix(){
+  const a = aluno(EU);
+  abrirFolha("Pagar mensalidade", () => { const comp = S.comprovantes.find(c => c.aluno === EU && !c.ok); return comp
+    ? `<div class="festa"><span class="em">⏳</span><h2>Comprovante enviado</h2><p class="muted">Em ${ddmm(deIso(comp.data))}. O ${esc(MARCA.curto)} confere e confirma por aqui.</p></div>
+       ${comp.img ? `<img class="midia" src="${comp.img}" alt="Comprovante enviado">` : ""}`
+    : `<div class="festa"><span class="em">💳</span><h2>${reais(a.valor)}</h2><p class="muted">Plano mensal · vence ${ddmm(deIso(S.venc[EU]))}</p></div>
+    <div class="qr-box">${qrFake(EU + S.venc[EU])}<span class="tiny muted">Abre o app do banco → Pix → Ler QR code</span></div>
+    <div class="campo"><span class="lbl">Ou Pix copia e cola</span><div class="row"><input class="inp grow mono" readonly value="${esc(copiaCola(a))}"><button type="button" class="btn" data-a="copiar" data-t="${esc(copiaCola(a))}" data-msg="Código Pix copiado">Copiar</button></div></div>
+    <div class="campo"><span class="lbl">Já pagou?</span><label class="btn pri full">Enviar comprovante<input type="file" accept="image/*,application/pdf" data-in="comprovante" hidden></label>
+      <button type="button" class="lnk small" data-a="semComprovante" style="align-self:center">Paguei, mas sem print</button></div>
+    <div class="demo"><span>🧪</span><span>QR e código ilustrativos. Depois do lançamento dá pra ligar a cobrança automática (Pix com baixa sozinha, cartão recorrente), como o ${esc(MARCA.curto)} pediu.</span></div>`; }, true);
+}
+function enviarComprovante(img){
+  S.comprovantes.push({id:uid(), aluno:EU, data:iso(hoje0()), valor:aluno(EU).valor, img: img || null, ok:false});
+  try { salvar(); } catch(e){ S.comprovantes[S.comprovantes.length-1].img = null; salvar(); }
+  desenharFolha(); render(); toast("Comprovante enviado pro " + MARCA.curto);
+}
+function confirmarPagamento(id){
+  const c = S.comprovantes.find(x => x.id === id); c.ok = true;
+  const v = deIso(S.venc[c.aluno]); S.venc[c.aluno] = iso(addDias(v, 30)); S.pagos[c.aluno] = iso(hoje0());
+  delete S.suspensos[c.aluno];
+  conversa(c.aluno).push({de:"j", txt:`Pagamento de ${reais(c.valor)} confirmado ✅ Obrigado! Próximo vencimento ${ddmm(addDias(v,30))}.`, ts:Date.now(), lido:false});
+  salvar(); pilha.length ? voltarFolha() : null; render(); toast(`${primeiro(aluno(c.aluno).nome)}: pagamento confirmado`);
+}
+function folhaComprovante(id){
+  const c = S.comprovantes.find(x => x.id === id), a = aluno(c.aluno);
+  abrirFolha(`Comprovante · ${primeiro(a.nome)}`, () => `<p class="small muted">${reais(c.valor)} · enviado ${quando(c.data)}</p>
+    ${c.img ? (c.img.startsWith("data:application/pdf") ? `<div class="vazio">PDF enviado</div>` : `<img class="midia" src="${c.img}" alt="Comprovante">`) : `<div class="vazio">${esc(primeiro(a.nome))} avisou que pagou, sem print. Confere no extrato.</div>`}
+    <button type="button" class="btn pri full" data-a="confirmarPag" data-id="${c.id}">Confirmar pagamento</button>
+    <button type="button" class="btn ghost full" data-a="recusarPag" data-id="${c.id}" style="color:var(--bad)">Não caiu na conta</button>`);
+}
+
+/* ================= Avisos no celular ================= */
+const AVISOS = [["treino","Lembrete de treino","Nos dias de treino, no horário que você escolher"],["novo","Treino novo disponível","Quando o Jorge troca teu treino"],
+  ["venc","Vencimento do plano","3 dias antes e no dia"],["msg","Mensagens do Jorge","Quando chega mensagem no chat"]];
+function htmlAvisos(){
+  const av = S.avisos;
+  return `<div class="lista">${AVISOS.map(([k,n,d]) => `<button type="button" class="it" data-a="aviso" data-k="${k}" aria-pressed="${!!av[k]}">
+      <span class="grow stack" style="gap:1px"><span class="t">${n}</span><span class="s">${d}${k === "treino" && av.treino ? ` · ${av.hora}` : ""}</span></span><span class="sw${av[k] ? " on" : ""}"><i></i></span></button>`).join("")}</div>
+    ${av.treino ? `<div class="campo"><span class="lbl">Horário do lembrete</span><div class="chips">${["06:00","12:00","18:00","20:00"].map(h => `<button type="button" class="chip" data-a="avisoHora" data-v="${h}" aria-pressed="${av.hora === h}">${h}</button>`).join("")}</div></div>` : ""}
+    <button type="button" class="btn sm" data-a="testarAviso" style="align-self:flex-start">Ver um aviso de exemplo</button>
+    <p class="tiny muted">No iPhone, os avisos só chegam com o app instalado na tela de início (iOS 16.4 ou mais novo). No Android funciona direto.</p>`;
+}
+function notificar(tit, txt){
+  const el = $("notif"); el.innerHTML = `<span class="logo sm">${esc(MARCA.iniciais)}</span><span class="grow stack" style="gap:0"><b>${esc(tit)}</b><span class="small">${esc(txt)}</span></span><span class="tiny muted">agora</span>`;
+  el.classList.add("on"); vibrar(80); clearTimeout(notificar.t); notificar.t = setTimeout(() => el.classList.remove("on"), 4200);
+}
+
+/* ================= Alimentação ================= */
+const nutriDe = id => S.nutri[id] || {orient:D.ORIENT, pdf:null, nutri:null};
+function cardNutri(id){
+  const n = nutriDe(id);
+  return `<details class="card dt"><summary class="row"><span class="ic ok">🥗</span><span class="grow"><b>Alimentação</b><br><span class="small muted">Orientações do ${esc(MARCA.curto)}${n.pdf ? " e plano do nutricionista" : ""}</span></span><span class="seta muted">›</span></summary>
+    <ul class="small orient">${n.orient.split("\n").filter(Boolean).map(l => `<li>${esc(l)}</li>`).join("")}</ul>
+    ${n.pdf ? `<button type="button" class="btn full" data-a="abrirPdf" data-id="${id}">📄 ${esc(n.pdf.nome)}</button><span class="tiny muted">Plano feito por ${esc(n.nutri || "nutricionista parceiro")}. Dúvida sobre a dieta é com ele(a).</span>` : ""}</details>`;
+}
+function folhaNutri(id){
+  const a = aluno(id), n = nutriDe(id);
+  abrirFolha(`Alimentação · ${primeiro(a.nome)}`, () => `<p class="small muted">Orientações gerais aparecem na tela inicial do aluno. Dieta individual (cardápio, quantidades) é atribuição do nutricionista: anexa o plano dele aqui.</p>
+    <div class="campo"><label for="nt-o">Orientações gerais (uma por linha)</label><textarea id="nt-o" class="inp" style="min-height:150px">${esc(n.orient)}</textarea></div>
+    <div class="campo"><label for="nt-n">Nutricionista parceiro</label><input id="nt-n" class="inp" value="${esc(n.nutri || "")}" placeholder="Nome e CRN"></div>
+    <div class="campo"><span class="lbl">Plano alimentar (PDF)</span>${n.pdf ? `<span class="small">📄 ${esc(n.pdf.nome)}</span>` : ""}<label class="btn sm" style="align-self:flex-start">${n.pdf ? "Trocar PDF" : "Anexar PDF"}<input type="file" accept="application/pdf,image/*" data-in="nutriPdf" data-id="${id}" hidden></label></div>
+    <button type="button" class="btn pri full" data-a="salvarNutri" data-id="${id}">Salvar</button>`);
 }
 
 /* ================= JORGE · Avaliação física (só ele vê) ================= */
@@ -1344,7 +1484,11 @@ function financeiro(){
 function vFinanceiro(){
   const f = financeiro(), h = hoje0();
   const tipos = ["Online","Híbrido","Presencial"].map(t => { const l = ALUNOS.filter(a => a.tipo === t); return {t, n:l.length, v:l.reduce((s,a) => s + a.valor, 0)}; });
-  const html = `<div class="card hero" style="gap:6px"><span class="eyebrow">Receita mensal recorrente</span><h2 style="max-width:none">${reais(f.previsto)}</h2>
+  const comps = S.comprovantes.filter(c => !c.ok);
+  const html = `${comps.length ? `<div class="sec"><h2>Comprovantes pra confirmar</h2><span class="chip acc">${comps.length}</span></div>
+    <div class="lista">${comps.map(c => { const a = aluno(c.aluno); return `<button type="button" class="it" data-a="verComprovante" data-id="${c.id}">${avatar(a)}
+      <span class="grow stack" style="gap:1px"><span class="t">${esc(a.nome)}</span><span class="s">${reais(c.valor)} · ${c.img ? "com comprovante" : "sem print"} · ${quando(c.data)}</span></span><span class="seta">›</span></button>`; }).join("")}</div>` : ""}
+    <div class="card hero" style="gap:6px"><span class="eyebrow">Receita mensal recorrente</span><h2 style="max-width:none">${reais(f.previsto)}</h2>
       <div class="meta"><span>${ALUNOS.length} alunos</span><span>ticket médio ${reais(Math.round(f.previsto/ALUNOS.length))}</span></div></div>
     <div class="kpis">
       <div class="kpi"><b style="color:var(--ok)">${reais(f.recebido)}</b><span>recebido em ${MESES[h.getMonth()]}</span></div>
@@ -1358,10 +1502,13 @@ function vFinanceiro(){
     <div class="lista">${f.linhas.map(({a, v, venc}) => `<div class="it">${avatar(a)}
       <button type="button" class="grow stack" data-a="verAluno" data-id="${a.id}" style="gap:1px;border:0;background:none;padding:0;text-align:left;min-width:0"><span class="t ellip">${esc(a.nome)}</span>
         <span class="s">${reais(a.valor)} · ${v < 0 ? `<b style="color:var(--bad)">atrasado ${plural(-v,"dia")}</b>` : v === 0 ? `<b style="color:var(--warn)">vence hoje</b>` : v <= 7 ? `<b style="color:var(--warn)">vence ${ddmm(venc)}</b>` : `vence ${ddmm(venc)}`}</span></button>
-      ${v <= 7 ? `<a class="btn sm" href="${wa(msgCobranca(a, v))}" target="_blank" rel="noopener">Cobrar</a>` : ""}
+      ${v <= 7 ? `<button type="button" class="btn sm" data-a="cobrar" data-id="${a.id}">Cobrar</button>` : ""}
       <button type="button" class="btn sm quad ${v <= 7 ? "pri" : ""}" data-a="pago" data-id="${a.id}" aria-label="Marcar ${esc(primeiro(a.nome))} como pago" title="Marcar como pago">✓</button></div>`).join("")}</div>
-    <p class="tiny muted">✓ marca como pago e joga o vencimento pro mês seguinte.</p>
-    <div class="demo"><span>💡</span><span>Na versão final dá pra ligar um link de pagamento (Pix ou cartão recorrente) que dá baixa sozinho, sem o ${esc(MARCA.curto)} precisar marcar.</span></div>`;
+    <p class="tiny muted">✓ marca como pago (Pix que caiu sem comprovante) e joga o vencimento pro mês seguinte.</p>
+    <div class="sec"><h2>Planos</h2></div>
+    <div class="lista">${PLANOS.map(pl => { const on = !!S.planosAtivos[pl.id]; return `<button type="button" class="it" data-a="plano" data-id="${pl.id}" aria-pressed="${on}">
+      <span class="grow stack" style="gap:1px"><span class="t">${pl.nome} · ${reais(pl.valor)}</span><span class="s">${pl.meses > 1 ? `${reais(Math.round(pl.valor/pl.meses))}/mês · ${Math.round((1 - pl.valor/(PLANOS[0].valor*pl.meses))*100)}% de desconto` : "o que você cobra hoje"} · ${on ? "aparece pro aluno" : "desligado"}</span></span><span class="sw${on ? " on" : ""}"><i></i></span></button>`; }).join("")}</div>
+    <div class="demo"><span>💡</span><span>Hoje: Pix com comprovante, você confirma. Fase 2: cobrança automática (Pix ou cartão recorrente) que dá baixa sozinha, como você pediu.</span></div>`;
   return {sub:"Mensalidades", tit:"Financeiro", html};
 }
 
@@ -1378,13 +1525,6 @@ function folhaInstalar(){
     <div class="card flat"><b>Android (Chrome)</b><ol class="small" style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px">
       <li>Abra o link no <b>Chrome</b></li><li>Toque nos <b>3 pontinhos</b> lá em cima</li><li>Escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b></li></ol></div>
     <p class="small muted">Vira um ícone com a logo do ${esc(MARCA.curto)}, abre em tela cheia como app e funciona até sem internet na academia. Não precisa de loja.</p>`, true);
-}
-function folhaPix(){
-  const a = aluno(EU);
-  abrirFolha("Pagar mensalidade", () => `<div class="festa"><span class="em">💳</span><h2>${reais(a.valor)}</h2><p class="muted">Plano ${esc(a.tipo)} · vence ${ddmm(deIso(S.venc[EU]))}</p></div>
-    <div class="campo"><span class="lbl">Chave Pix</span><div class="row"><input class="inp grow" readonly value="${esc(MARCA.pix)}"><button type="button" class="btn" data-a="copiar" data-t="${esc(MARCA.pix)}">Copiar</button></div></div>
-    <div class="demo"><span>🧪</span><span>Chave fictícia. Na versão final dá pra gerar um Pix com valor certo, ou cartão recorrente, com baixa automática.</span></div>
-    <a class="btn wa full" href="${wa("Jorge, paguei a mensalidade! Segue o comprovante:")}" target="_blank" rel="noopener">Mandar comprovante no WhatsApp</a>`, true);
 }
 function folhaRecado(){
   abrirFolha("Recado da semana", () => `<p class="small muted">Aparece na tela inicial de todos os alunos.</p>
@@ -1448,6 +1588,38 @@ const A = {
   novaAval(el){ folhaNovaAval(el.dataset.id); },
   verAvals(el){ folhaAvals(el.dataset.id); },
   salvarAval,
+  enviarChat(el){
+    const t = $("chat-txt"), txt = t.value.trim(); if (!txt) return;
+    const id = el.dataset.id, de = S.papel === "aluno" ? "a" : "j";
+    conversa(id).push({de, txt, ts:Date.now(), lido:false}); salvar();
+    if (pilha.length) desenharFolha(); else render();
+    rolarChat();
+  },
+  abrirChat(el){ folhaChat(el.dataset.id); },
+  irChat(){ fecharFolha(); irAba("chat"); },
+  novaConversa(){ abrirFolha("Nova mensagem", () => `<div class="lista">${ALUNOS.map(a => `<button type="button" class="it" data-a="abrirChat" data-id="${a.id}">${avatar(a)}<span class="grow t">${esc(a.nome)}</span><span class="seta">›</span></button>`).join("")}</div>`, true); },
+  msgAlerta(el){ const x = alertas().find(z => z.a.id === el.dataset.id); folhaChat(el.dataset.id, x ? x.msg : ""); },
+  cobrar(el){ const a = aluno(el.dataset.id); folhaChat(a.id, msgCobranca(a, diasAteVenc(a.id))); },
+  semComprovante(){ enviarComprovante(null); },
+  verComprovante(el){ folhaComprovante(el.dataset.id); },
+  confirmarPag(el){ confirmarPagamento(el.dataset.id); },
+  recusarPag(el){ const c = S.comprovantes.find(x => x.id === el.dataset.id); S.comprovantes = S.comprovantes.filter(x => x !== c);
+    conversa(c.aluno).push({de:"j", txt:"Oi! O Pix não apareceu aqui na conta ainda. Confere pra mim se saiu certinho?", ts:Date.now(), lido:false});
+    salvar(); voltarFolha(); render(); toast("Avisei no chat"); },
+  plano(el){ const id = el.dataset.id; if (id === "mensal"){ toast("O mensal fica sempre ligado"); return; } S.planosAtivos[id] = !S.planosAtivos[id]; salvar(); render(); },
+  suspender(el){ const id = el.dataset.id, a = aluno(id);
+    if (S.suspensos[id]){ delete S.suspensos[id]; toast(`${primeiro(a.nome)} reativado`); }
+    else { if (!confirm(`Pausar o acesso de ${a.nome}? Ele vê um aviso pra regularizar.`)) return; S.suspensos[id] = iso(hoje0()); toast(`Acesso de ${primeiro(a.nome)} pausado`); }
+    salvar(); desenharFolha(); render(); },
+  aviso(el){ const k = el.dataset.k; S.avisos[k] = !S.avisos[k]; salvar(); render(); },
+  avisoHora(el){ S.avisos.hora = el.dataset.v; salvar(); render(); },
+  testarAviso(){ const t = proximoTreino(EU); notificar(MARCA.nome, `Hoje tem treino ${t.letra}: ${t.nome}. Bora? 💪`); },
+  abrirPdf(el){ const n = nutriDe(el.dataset.id);
+    if (n.pdf && n.pdf.src){ const w = window.open(); if (w) w.document.write(`<iframe src="${n.pdf.src}" style="border:0;width:100%;height:100vh"></iframe>`); }
+    else abrirFolha(n.pdf.nome, () => `<div class="vazio">📄 Aqui abre o PDF do plano alimentar que o nutricionista parceiro mandou. No protótipo é só um exemplo.</div>`, true); },
+  verNutri(el){ folhaNutri(el.dataset.id); },
+  salvarNutri(el){ const id = el.dataset.id, n = Object.assign({}, nutriDe(id));
+    n.orient = $("nt-o").value.trim() || D.ORIENT; n.nutri = $("nt-n").value.trim(); S.nutri[id] = n; salvar(); voltarFolha(); toast("Alimentação salva"); },
   verEvolucao(el){ sub.evo = "desemp"; folhaEvolucao(el.dataset.id); },
   verTodosAl(){ sub.verTodosAl = true; render(); },
   verAluno(el){ folhaAluno(el.dataset.id); },
@@ -1483,7 +1655,7 @@ const A = {
   edSalvar(){
     if (ED.treinos.some(t => !t.exs.length)){ toast("Tem treino sem exercício. Adiciona ou apaga ele."); return; }
     S.treinos[ED.aluno] = ED.treinos; S.programa[ED.aluno] = ED.programa; S.troca[ED.aluno] = ED.troca; salvar();
-    toast(`Treino de ${primeiro(aluno(ED.aluno).nome)} atualizado. Já aparece no app.`); fecharFolha(); render();
+    toast(`Treino de ${primeiro(aluno(ED.aluno).nome)} atualizado. Aviso de treino novo enviado 🔔`); fecharFolha(); render();
   },
   verModelo(el){ folhaModelo(el.dataset.id); },
   selModelo(el){ const id = el.dataset.id; selModelo.has(id) ? selModelo.delete(id) : selModelo.add(id); desenharFolha(); },
@@ -1551,6 +1723,16 @@ document.addEventListener("change", e => {
       if (S.exExtra[id]) S.exExtra[id].img = fr.result; else S.midia[id] = Object.assign({}, S.midia[id], {img: fr.result});
       try { salvar(); } catch(err){}
       desenharFolha(); render(); toast("GIF/imagem salvo ✅");
+    };
+    fr.readAsDataURL(f);
+    return;
+  }
+  if (el.dataset && (el.dataset.in === "comprovante" || el.dataset.in === "nutriPdf") && el.files && el.files[0]){
+    const f = el.files[0], fr = new FileReader();
+    fr.onload = () => {
+      const src = f.size > 1.5e6 ? null : fr.result;
+      if (el.dataset.in === "comprovante") enviarComprovante(src);
+      else { const id = el.dataset.id; S.nutri[id] = Object.assign({}, nutriDe(id), {pdf:{nome:f.name, src}}); salvar(); desenharFolha(); toast("PDF anexado"); }
     };
     fr.readAsDataURL(f);
     return;

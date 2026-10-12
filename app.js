@@ -57,14 +57,14 @@ const ICON = {
 const svg = (k, cls="") => `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true">${ICON[k]}</svg>`;
 
 /* ================= estado ================= */
-const CHAVE = "jorge-personal:v5";
+const CHAVE = "jorge-personal:v6";
 let S;
 
 function carregar(){
   try {
     const s = JSON.parse(store.get(CHAVE));
     /* demonstração "envelhecida" (aberta muitos dias depois): recomeça com datas novas */
-    if (s && s.v === 5 && diasDesde(s.semente) < 5) return s;
+    if (s && s.v === 6 && diasDesde(s.semente) < 5) return s;
   } catch(e){}
   return null;
 }
@@ -89,9 +89,17 @@ function ligacoes(exs){
   }
   return out;
 }
+/* plano série a série do Jorge: [{reps, kg}]. Sem plano, todas as séries iguais (reps e carga do exercício).
+   Faltando série no plano, repete a última (ex.: aumentou de 3 pra 4 séries) */
+function planoSeries(e){
+  const pl = e.plano || [], ult = pl[pl.length-1] || {reps:String(e.reps), kg:e.carga};
+  return Array.from({length: e.series}, (_, k) => Object.assign({}, pl[k] || ult));
+}
+const planoVaria = e => { const p = planoSeries(e); return p.some(x => x.reps !== p[0].reps || x.kg !== p[0].kg); };
+const txtSerie = x => `${esc(x.reps)}${x.kg != null ? `×${fmt(x.kg)}kg` : ""}`;
 /* linha de detalhes do exercício: séries × reps · descanso · cadência · RIR · método */
 function detalhes(e){
-  const p = [`${e.series} × ${esc(e.reps)}`];
+  const p = [planoVaria(e) ? `${e.series} séries: ${planoSeries(e).map(txtSerie).join(" · ")}` : `${e.series} × ${esc(e.reps)}`];
   if (e.desc && !e.jun) p.push(`descanso ${e.desc}s`);
   if (e.cad) p.push(`cadência ${esc(e.cad)}`);
   if (e.int) p.push(esc(e.int));
@@ -116,7 +124,7 @@ const gruposDe = t => [...new Set(t.exs.map(e => ex(e.id).grupo).filter(g => g &
 
 function semear(){
   const h = hoje0(), r = rng(20261009);
-  const s = {v:5, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], avals:{}, treinos:{}, programa:{},
+  const s = {v:6, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], avals:{}, treinos:{}, programa:{},
     venc:{}, pagos:{}, exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2)),
     /* cadastro: o aluno se inscreve e o Jorge aprova */
     pendentes: D.PENDENTES.map(p => Object.assign({}, p, {data: iso(addDias(h, -p.diasAtras)), termo: iso(addDias(h, -p.diasAtras))})),
@@ -142,8 +150,9 @@ function semear(){
     const series = []; let vol = 0;
     if (comSeries) t.exs.forEach(e => {
       for (let k = 0; k < e.series; k++){
-        const kg = e.carga == null ? null : arred(e.carga * (0.8 + 0.2*prog));
-        const reps = Math.max(1, repsNum(e.reps) - (k === e.series-1 && r() < .4 ? 1 : 0));
+        const pl = planoSeries(e)[k];
+        const kg = pl.kg == null ? null : arred(pl.kg * (0.8 + 0.2*prog));
+        const reps = Math.max(1, repsNum(pl.reps) - (k === e.series-1 && r() < .4 ? 1 : 0));
         series.push({ex:e.id, kg, reps});
         if (kg) vol += kg*reps;
       }
@@ -421,7 +430,7 @@ function cardTreino(t, aid, aberto){
     <div class="trn">${(() => { const lg = ligacoes(t.exs); return t.exs.map((e,i) => {
       const u = seriesAnteriores(aid, e.id), kg = u && u.series[0].kg != null ? u.series[u.series.length-1].kg : e.carga;
       return `<div class="ex${lg[i] && lg[i].pos < lg[i].tam ? " lig" : ""}${lg[i] && lg[i].pos > 1 ? " lig2" : ""}"><span class="n">${i+1}</span><div class="grow stack" style="gap:2px"><b>${esc(ex(e.id).nome)}</b>
-        <span class="small muted">${detalhes(e)}${kg != null ? ` · <b style="color:var(--ink)">${fmt(kg)} kg</b>` : ""}</span>
+        <span class="small muted">${detalhes(e)}${kg != null && !planoVaria(e) ? ` · <b style="color:var(--ink)">${fmt(kg)} kg</b>` : ""}</span>
         ${lg[i] || chipMetodo(e) ? `<span class="chips">${chipLig(lg[i])}${chipMetodo(e)}</span>` : ""}
         ${e.obs ? `<span class="small" style="color:var(--warn)">${esc(e.obs)}</span>` : ""}</div></div>`;}).join(""); })()}
     </div>
@@ -785,10 +794,10 @@ function comecar(letra){
   abrirExec();
 }
 function preencher(e, exId){
-  const u = seriesAnteriores(EU, exId), out = [];
+  const u = seriesAnteriores(EU, exId), pl = planoSeries(e), out = [];
   for (let k = 0; k < e.series; k++){
     const p = u ? (u.series[k] || u.series[u.series.length-1]) : null;
-    out.push({kg: p && p.kg != null ? p.kg : (exId === e.id ? e.carga : null), reps: p ? p.reps : repsNum(e.reps), ok:false, pr:false});
+    out.push({kg: p && p.kg != null ? p.kg : (exId === e.id ? pl[k].kg : null), reps: p ? p.reps : repsNum(pl[k].reps), ok:false, pr:false});
   }
   return out;
 }
@@ -816,7 +825,8 @@ function cardExec(e, i, atual){
       <h3>${esc(info.nome)}</h3>
       <span class="small muted">${detalhes(e)}${e.trocadoDe ? ` · <span style="color:var(--info)">trocado</span>` : ""}</span>
       ${lg || chipMetodo(e) ? `<span class="chips">${chipLig(lg)}${chipMetodo(e)}</span>` : ""}
-      <span class="ult">${ultTxt}</span></div></div>
+      <span class="ult">${ultTxt}</span>
+      ${u ? `<span class="tiny muted">Os quadradinhos já vêm com o que você fez da última vez. Ajusta se mudou.</span>` : ""}</div></div>
     ${lg && lg.pos < lg.tam ? `<div class="dica"><span>🔗</span><span>Sem descanso: emenda direto no <b>${esc(ex(exsExec()[i+1].id).nome)}</b>.</span></div>` : ""}
     ${e.obs ? `<div class="obsj">📌 <b>${esc(MARCA.curto)}:</b> ${esc(e.obs)}</div>` : ""}
     ${E.dicas[i] === "dica" ? `<div class="dica"><span>💡</span><span><b>Como fazer:</b> ${esc(info.dica)}</span></div>` : ""}
@@ -827,14 +837,14 @@ function cardExec(e, i, atual){
       ${info.alt && info.alt.length ? `<button type="button" data-a="trocar" data-i="${i}">⇄ Trocar</button>` : ""}
     </div>
     <div class="series">
-      <div class="sr cab"><span>Série</span><span style="text-align:center">${temKg ? "KG" : ""}</span><span style="text-align:center">${unid}</span><span></span></div>
-      ${sets.map((z,k) => `<div class="sr${z.ok ? " feita" : ""}">
-        <span class="sn">${k+1}</span>
+      <div class="sr cab"><span>Meta</span><span style="text-align:center">${temKg ? "KG" : ""}</span><span style="text-align:center">${unid}</span><span></span></div>
+      ${sets.map((z,k) => { const m = e.trocadoDe ? null : planoSeries(e)[k]; return `<div class="sr${z.ok ? " feita" : ""}">
+        <span class="sn">${k+1}${m ? `<small class="meta" title="Meta do ${esc(MARCA.curto)}">${txtSerie(m)}</small>` : ""}</span>
         ${temKg ? `<input inputmode="decimal" data-in="set" data-i="${i}" data-k="${k}" data-c="kg" value="${z.kg != null ? fmt(z.kg) : ""}" aria-label="Carga da série ${k+1}">` : `<span class="muted" style="text-align:center">—</span>`}
         <input inputmode="numeric" data-in="set" data-i="${i}" data-k="${k}" data-c="reps" value="${z.reps ?? ""}" aria-label="Repetições da série ${k+1}">
         <button type="button" class="ok-b" data-a="serie" data-i="${i}" data-k="${k}" aria-label="Marcar série ${k+1} como feita" aria-pressed="${z.ok}">${svg("ok")}</button>
         ${z.pr ? `<span class="pr">🏆 Recorde pessoal!</span>` : ""}
-      </div>`).join("")}
+      </div>`; }).join("")}
     </div></div>`;
 }
 function desenharExec(){
@@ -1404,16 +1414,26 @@ function folhaEditor(){
       <div class="row"><span class="n" style="flex:none;width:22px;height:22px;border-radius:50%;background:var(--sunk);display:grid;place-items:center;font-size:.7rem;font-weight:800">${i+1}</span><b class="grow">${esc(ex(e.id).nome)}</b>
         <span class="mini"><button type="button" data-a="edMover" data-i="${i}" data-d="-1" aria-label="Subir">↑</button><button type="button" data-a="edMover" data-i="${i}" data-d="1" aria-label="Descer">↓</button><button type="button" class="x" data-a="edTirar" data-i="${i}" aria-label="Remover">✕</button></span></div>
       ${lg[i] || chipMetodo(e) ? `<div class="chips">${chipLig(lg[i])}${chipMetodo(e)}</div>` : ""}
-      <div class="ed-campos">
+      ${cardio || mob ? `<div class="ed-campos">
         ${campoEd(i,"series","Séries",e.series,'inputmode="numeric"')}
         ${campoEd(i,"reps",cardio ? "Volume" : "Reps",e.reps,cardio ? 'placeholder="20 min"' : "")}
         ${campoEd(i,"desc","Desc. (s)",e.desc,'inputmode="numeric"')}
-        ${cardio || mob ? campoEd(i,"int",cardio ? "Zona/ritmo" : "Lado",e.int,cardio ? 'placeholder="Zona 2"' : 'placeholder="cada"') : campoEd(i,"carga","Carga",e.carga != null ? fmt(e.carga) : "",'inputmode="decimal" placeholder="—"')}
-      </div>
-      ${cardio || mob ? "" : `<div class="ed-campos">
+        ${campoEd(i,"int",cardio ? "Zona/ritmo" : "Lado",e.int,cardio ? 'placeholder="Zona 2"' : 'placeholder="cada"')}
+      </div>` : `<div class="ed-campos">
+        ${campoEd(i,"series","Séries",e.series,'inputmode="numeric"')}
+        ${campoEd(i,"desc","Desc. (s)",e.desc,'inputmode="numeric"')}
         ${campoEd(i,"cad","Cadência",e.cad,'placeholder="3-0-1-0"')}
         ${campoEd(i,"int","RIR/RPE",e.int,'placeholder="RIR 2"')}
-        <label class="span2">Método<select data-in="ed" data-i="${i}" data-c="met">${METODOS.map(m => `<option${m === (e.met || "Normal") ? " selected" : ""}>${m}</option>`).join("")}</select></label>
+      </div>
+      <div class="ed-sr">
+        <span class="lbl">Série</span><span class="lbl">Reps</span><span class="lbl">Carga (kg)</span>
+        ${planoSeries(e).map((x,k) => `<span class="sn">${k+1}</span>
+          <input data-in="edS" data-i="${i}" data-k="${k}" data-c="reps" value="${esc(x.reps)}" aria-label="Repetições da série ${k+1}">
+          <input inputmode="decimal" data-in="edS" data-i="${i}" data-k="${k}" data-c="kg" value="${x.kg != null ? fmt(x.kg) : ""}" placeholder="—" aria-label="Carga da série ${k+1}">`).join("")}
+      </div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        ${planoVaria(e) ? `<button type="button" class="btn sm" data-a="edIguais" data-i="${i}">Igualar à série 1</button>` : ""}
+        <label class="metodo-sel">Método<select data-in="ed" data-i="${i}" data-c="met">${METODOS.map(m => `<option${m === (e.met || "Normal") ? " selected" : ""}>${m}</option>`).join("")}</select></label>
       </div>`}
       <input class="ed-obs" data-in="ed" data-i="${i}" data-c="obs" value="${esc(e.obs)}" placeholder="Observação pro aluno (opcional)">
       ${i < t.exs.length - 1 ? `<button type="button" class="lig-b" data-a="edLigar" data-i="${i}" aria-pressed="${!!e.jun}">🔗 ${e.jun ? "Ligado ao próximo (sem descanso entre eles)" : "Juntar com o próximo (bi-set)"}</button>` : ""}
@@ -1441,8 +1461,10 @@ function aplicarProg(tipo){
   const ini = -diasDesde(ED.troca) > 0 ? deIso(ED.troca) : hoje0();
   (S.anteriores[ED.aluno] = S.anteriores[ED.aluno] || []).push({ate: iso(ini), programa: ED.programa, treinos: clone(ED.treinos)});
   ED.treinos.forEach(t => t.exs.forEach((e, i) => {
-    if (tipo === "reps" && !ehCardio(e.id) && !/s$/.test(e.reps)) e.reps = somaReps(e.reps, 1);
-    if (tipo === "carga" && e.carga != null) e.carga = Math.round((e.carga + (/halter/i.test(ex(e.id).nome) ? 1 : 2.5))*10)/10;
+    if (tipo === "reps" && !ehCardio(e.id) && !/s$/.test(e.reps)){ e.reps = somaReps(e.reps, 1); if (e.plano) e.plano.forEach(x => x.reps = somaReps(x.reps, 1)); }
+    const inc = /halter/i.test(ex(e.id).nome) ? 1 : 2.5;
+    if (tipo === "carga" && e.carga != null) e.carga = Math.round((e.carga + inc)*10)/10;
+    if (tipo === "carga" && e.plano) e.plano.forEach(x => { if (x.kg != null) x.kg = Math.round((x.kg + inc)*10)/10; });
     if (tipo === "serie" && i < 2 && !ehCardio(e.id)) e.series += 1;
   }));
   ED.troca = iso(addDias(ini, 15)); ED.novaQ = true;
@@ -1668,11 +1690,12 @@ const A = {
   edAdd: folhaAddEx,
   grupoAdd(el){ sub.grupoAdd = el.dataset.v; desenharFolha(); },
   edEscolher(el){ const id = el.dataset.id, c = ehCardio(id), m = ex(id).grupo === "Mobilidade";
-    ED.treinos[ED.aba].exs.push({id, series: c ? 1 : 3, reps: c ? "20 min" : m ? "30s" : "12", desc: c ? 0 : m ? 15 : 60, carga:null, obs:"", cad:"", int:"", met:"Normal", jun:false});
+    ED.treinos[ED.aba].exs.push({id, series: c ? 1 : 3, reps: c ? "20 min" : m ? "30s" : "12", desc: c ? 0 : m ? 15 : 60, carga:null, plano:null, obs:"", cad:"", int:"", met:"Normal", jun:false});
     voltarFolha(); toast(`${ex(id).nome} adicionado`);
     setTimeout(() => { const c = $("folha-c"); c.scrollTop = c.scrollHeight; }, 50); },
   aplicarModelo: folhaModelos,
   edModelo(el){ const m = todosModelos().find(x => x.id === el.dataset.id); ED.treinos = clone(m.treinos); ED.programa = m.nome; ED.aba = 0; voltarFolha(); toast(`Modelo “${m.nome}” aplicado`); },
+  edIguais(el){ const x = ED.treinos[ED.aba].exs[+el.dataset.i], p = planoSeries(x)[0]; x.plano = null; x.reps = p.reps; x.carga = p.kg; desenharFolha(); },
   edLigar(el){ const e = ED.treinos[ED.aba].exs[+el.dataset.i]; e.jun = !e.jun; desenharFolha(); },
   edQuinzena: folhaQuinzena,
   edProg(el){ aplicarProg(el.dataset.v); voltarFolha(); toast(`Quinzena nova até ${ddmm(deIso(ED.troca))}. Ajusta o que quiser e salva.`); },
@@ -1733,6 +1756,12 @@ document.addEventListener("input", e => {
   else if (t === "busca"){ filtro.busca = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="busca"]'); n.focus(); n.setSelectionRange(p,p); }
   else if (t === "buscaEx"){ sub.buscaEx = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="buscaEx"]'); n.focus(); n.setSelectionRange(p,p); }
   else if (t === "buscaAdd"){ sub.buscaAdd = el.value; const p = el.selectionStart; desenharFolha(); const n = document.querySelector('[data-in="buscaAdd"]'); n.focus(); n.setSelectionRange(p,p); }
+  else if (t === "edS"){
+    const x = ED.treinos[ED.aba].exs[+el.dataset.i], k = +el.dataset.k, c = el.dataset.c;
+    x.plano = planoSeries(x);
+    x.plano[k][c] = c === "kg" ? numIn(el.value) : el.value;
+    x.reps = x.plano[0].reps; x.carga = x.plano[0].kg;   /* o resumo do exercício segue a 1ª série */
+  }
   else if (t === "edNome"){ ED.treinos[ED.aba].nome = el.value; }
   else if (t === "ed"){
     const x = ED.treinos[ED.aba].exs[+el.dataset.i], c = el.dataset.c;
@@ -1742,6 +1771,15 @@ document.addEventListener("input", e => {
 });
 document.addEventListener("change", e => {
   const el = e.target;
+  /* mudou o número de séries (ou uma série do plano): redesenha e devolve o foco pro campo que a pessoa tocou */
+  if (el.dataset && ED && ((el.dataset.in === "ed" && el.dataset.c === "series") || el.dataset.in === "edS")){
+    setTimeout(() => {
+      const f = document.activeElement, d = f && f.dataset ? Object.assign({}, f.dataset) : null;
+      desenharFolha();
+      if (d && d.in){ const sel = Object.entries(d).map(([k,v]) => `[data-${k.replace(/[A-Z]/g, c => "-" + c.toLowerCase())}="${v}"]`).join(""); const n = document.querySelector("#folha-c " + sel); if (n) n.focus(); }
+    }, 0);
+    return;
+  }
   /* GIF/imagem do exercício: guarda o arquivo como está (GIF continua animado) */
   if (el.dataset && el.dataset.in === "exImg" && el.files && el.files[0]){
     const f = el.files[0];
@@ -1783,7 +1821,7 @@ document.addEventListener("change", e => {
   }
 });
 /* o input de quantidade sai do foco: seleciona tudo ao tocar (mais fácil de trocar a carga) */
-document.addEventListener("focusin", e => { if (e.target.matches && e.target.matches(".sr input, .ed-campos input")) setTimeout(() => e.target.select(), 0); });
+document.addEventListener("focusin", e => { if (e.target.matches && e.target.matches(".sr input, .ed-campos input, .ed-sr input")) setTimeout(() => e.target.select(), 0); });
 
 /* ================= início ================= */
 S = carregar() || semear();

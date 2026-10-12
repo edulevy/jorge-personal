@@ -105,12 +105,14 @@ const EX = {
 const METODOS = ["Normal","Drop-set","Rest-pause","Pirâmide","Cluster","FST-7","Isometria","Parciais","Negativa"];
 
 /* exercício do treino: [id, séries, reps, descanso (s), carga sugerida (kg) ou null, observação, extra]
-   extra: cad (cadência: descida-pausa-subida-pausa), int (RIR/RPE, ou zona/ritmo no cardio), met (método), jun (junta com o próximo: bi-set) */
-const e = (id, series, reps, desc, carga, obs, x) => Object.assign({id, series, reps, desc, carga: carga ?? null, obs: obs || "", cad:"", int:"", met:"Normal", jun:false}, x || {});
+   extra: cad (cadência: descida-pausa-subida-pausa), int (RIR/RPE, ou zona/ritmo no cardio), met (método), jun (junta com o próximo: bi-set),
+   plano (carga e reps de cada série: [{reps, kg}]; sem plano, todas as séries iguais) */
+const e = (id, series, reps, desc, carga, obs, x) => Object.assign({id, series, reps, desc, carga: carga ?? null, plano:null, obs: obs || "", cad:"", int:"", met:"Normal", jun:false}, x || {});
 
 const T_MARINA = [
   {letra:"A", nome:"Inferior · quadríceps", local:"academia", exs:[
-    e("agachamento",4,"8–10",90,40,"Aquecimento: 2 séries leves antes.",{cad:"3-1-1-0", int:"RIR 2"}),
+    e("agachamento",4,"10",90,35,"Aquecimento: 2 séries leves antes. Sobe a carga a cada série.",{cad:"3-1-1-0", int:"RIR 2", met:"Pirâmide",
+      plano:[{reps:"10", kg:35},{reps:"8", kg:40},{reps:"8", kg:40},{reps:"6", kg:42.5}]}),
     e("leg_press",3,"12",90,120,"",{cad:"3-0-1-0", int:"RIR 2"}),
     e("afundo",3,"10 cada",75,10,"Carga em cada mão.",{int:"RIR 2"}),
     e("extensora",3,"12–15",60,35,"Na última série: tira 30% da carga e vai até a falha.",{cad:"2-0-1-1", int:"RIR 1", met:"Drop-set"}),
@@ -126,7 +128,8 @@ const T_MARINA = [
     e("rosca_direta",3,"12",60,16,"",{int:"RIR 1"})]},
   {letra:"C", nome:"Inferior · posterior e glúteo", local:"academia", exs:[
     e("stiff",4,"10",90,14,"Carga em cada mão.",{cad:"3-1-1-0", int:"RIR 2"}),
-    e("elevacao_pelvica",4,"10",90,60,"",{cad:"2-0-1-2", int:"RIR 1"}),
+    e("elevacao_pelvica",4,"12",90,50,"",{cad:"2-0-1-2", int:"RIR 1",
+      plano:[{reps:"12", kg:50},{reps:"10", kg:60},{reps:"10", kg:60},{reps:"8", kg:65}]}),
     e("mesa_flexora",3,"12",60,30,"",{int:"RIR 2"}),
     e("bulgaro",3,"10 cada",75,8,"",{int:"RIR 2"}),
     e("abdutora",3,"15",45,45,"Faz 15, descansa 15 segundos e faz mais o que der.",{int:"RIR 0", met:"Rest-pause"}),

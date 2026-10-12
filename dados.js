@@ -166,29 +166,31 @@ const MODELOS = [
 /* alunos fictícios. ult: dias desde o último treino · sem/meta: treinos na semana · ck: dias desde o último check-in
    venc: dias até o vencimento (negativo = atrasado) · desde: meses de consultoria */
 const A = (id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, extra) =>
-  Object.assign({id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, dor:null, restricao:"", nota:""}, extra||{});
+  Object.assign({id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, dor:null, restricao:"", nota:"", plano:"mensal",
+    sx: FEM.includes(id) ? "F" : "M"}, extra||{});
+const FEM = ["marina","juliana","camila","fernanda","patricia","aline","beatriz","larissa","vanessa","carla"];
 
 const ALUNOS = [
-  A("marina","Marina Costa",29,"Online","Hipertrofia e definição",250,6,1,2,4,7,66.8,64.9,"hiper_abc",8,
+  A("marina","Marina Costa",29,"Online","Hipertrofia e definição",200,6,1,2,4,7,66.8,64.9,"hiper_abc",8,
     {restricao:"Dor leve no ombro direito (2025). Nada de desenvolvimento atrás da nuca.", nota:"Treina às 6h antes do trabalho. Responde melhor a áudio."}),
-  A("pedro","Pedro Almeida",34,"Presencial","Ganhar massa",800,12,0,3,3,4,72.0,75.4,"hiper_abc",14),
-  A("juliana","Juliana Rocha",41,"Online","Emagrecer 8 kg",250,3,2,2,3,6,84.0,79.1,"fullbody",5,{nota:"Viaja muito a trabalho: usar treino em casa."}),
-  A("rafael","Rafael Souza",27,"Híbrido","Força e performance no jiu-jítsu",450,18,1,3,4,2,81.0,82.2,"hiper_abc",10),
-  A("camila","Camila Ferreira",31,"Online","Glúteo e pernas",250,21,0,4,4,1,58.5,59.8,"hiper_abc",6),
-  A("bruno","Bruno Lima",38,"Online","Emagrecer",250,9,9,0,3,16,98.0,94.6,"fullbody",4,{nota:"Sumiu depois das férias."}),
-  A("fernanda","Fernanda Dias",45,"Presencial","Saúde e postura",800,15,1,2,2,5,63.0,61.7,"iniciante",3,{restricao:"Hérnia de disco L4-L5 controlada. Sem carga axial pesada."}),
+  A("pedro","Pedro Almeida",34,"Presencial","Ganhar massa",200,12,0,3,3,4,72.0,75.4,"hiper_abc",14),
+  A("juliana","Juliana Rocha",41,"Online","Emagrecer 8 kg",200,3,2,2,3,6,84.0,79.1,"fullbody",5,{nota:"Viaja muito a trabalho: usar treino em casa."}),
+  A("rafael","Rafael Souza",27,"Híbrido","Força e performance no jiu-jítsu",200,18,1,3,4,2,81.0,82.2,"hiper_abc",10),
+  A("camila","Camila Ferreira",31,"Online","Glúteo e pernas",200,21,0,4,4,1,58.5,59.8,"hiper_abc",6),
+  A("bruno","Bruno Lima",38,"Online","Emagrecer",200,9,9,0,3,16,98.0,94.6,"fullbody",4,{nota:"Sumiu depois das férias."}),
+  A("fernanda","Fernanda Dias",45,"Presencial","Saúde e postura",200,15,1,2,2,5,63.0,61.7,"iniciante",3,{restricao:"Hérnia de disco L4-L5 controlada. Sem carga axial pesada."}),
   A("lucas","Lucas Martins",22,"Online","Hipertrofia",200,25,6,0,4,9,68.0,70.5,"hiper_abc",7,{nota:"Época de prova na faculdade."}),
-  A("patricia","Patrícia Gomes",52,"Online","Emagrecer e ganhar disposição",250,1,1,3,3,3,79.5,74.0,"fullbody",9),
-  A("thiago","Thiago Ribeiro",30,"Online","Hipertrofia",250,-3,2,2,4,6,77.0,79.0,"hiper_abc",11),
-  A("aline","Aline Barbosa",36,"Híbrido","Voltar a treinar depois da gestação",450,2,0,3,3,1,70.0,67.2,"iniciante",2,{restricao:"Pós-parto (8 meses). Liberada pela médica; cuidado com diástase."}),
-  A("gustavo","Gustavo Pereira",43,"Online","Emagrecer e baixar a pressão",250,14,3,1,3,8,104.0,99.3,"fullbody",6,{restricao:"Hipertenso, toma remédio. Evitar apneia (prender a respiração)."}),
-  A("beatriz","Beatriz Cardoso",25,"Online","Definição pro casamento",250,28,0,4,5,2,61.0,58.6,"hiper_abc",4,{nota:"Casamento em março."}),
-  A("diego","Diego Nunes",33,"Online","Hipertrofia",250,11,2,2,4,1,74.0,76.1,"hiper_abc",8,{dor:"Lombar travou no levantamento terra."}),
+  A("patricia","Patrícia Gomes",52,"Online","Emagrecer e ganhar disposição",200,1,1,3,3,3,79.5,74.0,"fullbody",9),
+  A("thiago","Thiago Ribeiro",30,"Online","Hipertrofia",200,-3,2,2,4,6,77.0,79.0,"hiper_abc",11),
+  A("aline","Aline Barbosa",36,"Híbrido","Voltar a treinar depois da gestação",200,2,0,3,3,1,70.0,67.2,"iniciante",2,{restricao:"Pós-parto (8 meses). Liberada pela médica; cuidado com diástase."}),
+  A("gustavo","Gustavo Pereira",43,"Online","Emagrecer e baixar a pressão",200,14,3,1,3,8,104.0,99.3,"fullbody",6,{restricao:"Hipertenso, toma remédio. Evitar apneia (prender a respiração)."}),
+  A("beatriz","Beatriz Cardoso",25,"Online","Definição pro casamento",200,28,0,4,5,2,61.0,58.6,"hiper_abc",4,{nota:"Casamento em março."}),
+  A("diego","Diego Nunes",33,"Online","Hipertrofia",200,11,2,2,4,1,74.0,76.1,"hiper_abc",8,{dor:"Lombar travou no levantamento terra."}),
   A("larissa","Larissa Teixeira",28,"Online","Condicionamento",200,19,4,1,3,15,64.0,63.2,"fullbody",3),
-  A("ricardo","Ricardo Moura",47,"Presencial","Saúde e força",800,-1,12,0,2,20,88.0,86.5,"iniciante",12,{nota:"Cirurgia no joelho em agosto; liberado pelo ortopedista."}),
-  A("vanessa","Vanessa Pinto",39,"Online","Emagrecer",250,7,1,3,4,4,76.0,71.8,"fullbody",7),
-  A("andre","André Castro",29,"Online","Hipertrofia",250,23,2,3,5,5,80.0,83.4,"hiper_abc",15),
-  A("carla","Carla Mendes",57,"Presencial","Osteopenia: fortalecer ossos",800,5,1,2,2,3,60.0,60.4,"iniciante",9,{restricao:"Osteopenia. Priorizar força com carga progressiva e equilíbrio."}),
+  A("ricardo","Ricardo Moura",47,"Presencial","Saúde e força",200,-1,12,0,2,20,88.0,86.5,"iniciante",12,{nota:"Cirurgia no joelho em agosto; liberado pelo ortopedista."}),
+  A("vanessa","Vanessa Pinto",39,"Online","Emagrecer",200,7,1,3,4,4,76.0,71.8,"fullbody",7),
+  A("andre","André Castro",29,"Online","Hipertrofia",200,23,2,3,5,5,80.0,83.4,"hiper_abc",15),
+  A("carla","Carla Mendes",57,"Presencial","Osteopenia: fortalecer ossos",200,5,1,2,2,3,60.0,60.4,"iniciante",9,{restricao:"Osteopenia. Priorizar força com carga progressiva e equilíbrio."}),
   A("felipe","Felipe Araújo",24,"Online","Hipertrofia",200,16,5,1,4,10,66.0,68.9,"hiper_abc",2,{dor:"Dor no punho no supino."})
 ];
 
@@ -200,14 +202,47 @@ const HABITOS = [
   {id:"sono", nome:"Sono", meta:"7 h", icone:"🌙"}
 ];
 
+/* planos: mensal ativo; trimestral e semestral prontos pra ligar quando o Jorge quiser (recorrência) */
+const PLANOS = [
+  {id:"mensal", nome:"Mensal", meses:1, valor:200, ativo:true},
+  {id:"trimestral", nome:"Trimestral", meses:3, valor:540, ativo:false},
+  {id:"semestral", nome:"Semestral", meses:6, valor:1020, ativo:false}
+];
+
+/* PAR-Q (questionário de prontidão pra atividade física). Algum "sim" = pedir liberação médica */
+const PARQ = [
+  "Algum médico já disse que você tem problema de coração e só deve fazer atividade física recomendada por ele?",
+  "Você sente dor no peito quando faz atividade física?",
+  "No último mês, você sentiu dor no peito sem estar fazendo atividade física?",
+  "Você perde o equilíbrio por tontura ou já desmaiou alguma vez?",
+  "Você tem algum problema nos ossos ou nas articulações que pode piorar com atividade física?",
+  "Você toma remédio pra pressão ou pro coração?",
+  "Existe algum outro motivo pelo qual você não deveria fazer atividade física?"
+];
+
+/* termo de consentimento (LGPD). Texto de exemplo: o definitivo passa por um advogado */
+const TERMO = [
+  "Autorizo o Jorge a guardar e usar meus dados (cadastro, anamnese, avaliações, fotos e treinos) só pra montar e acompanhar meu treino.",
+  "Meus dados de saúde e fotos são vistos só pelo Jorge. Não são vendidos nem passados pra ninguém.",
+  "Os dados ficam guardados enquanto eu for aluno e depois disso, até eu pedir pra apagar. Posso pedir pra ver, corrigir ou apagar tudo a qualquer momento, pelo próprio app.",
+  "Entendo que a consultoria não substitui acompanhamento médico, e que devo avisar o Jorge sobre qualquer dor, lesão ou mudança de saúde."
+];
+
+/* cadastro de exemplo esperando aprovação do Jorge */
+const PENDENTES = [
+  {id:"rodrigo", nome:"Rodrigo Alves", idade:26, sx:"M", tipo:"Online", objetivo:"Hipertrofia", whats:"(21) 9xxxx-xxxx", email:"rodrigo@exemplo.com",
+   parq:[0,0,0,0,1,0,0], lesoes:"Torci o tornozelo direito jogando bola em 2024.", remedios:"Nenhum", rotina:"Treino há 1 ano por conta própria, 4x na semana.",
+   dias:"Seg, ter, qui e sex à noite", diasAtras:1}
+];
+
 const RECADO = "Semana de subir carga no agachamento! Se as 4 séries saírem limpas, sobe 2,5 kg na próxima. Qualquer dor no ombro, me avisa antes de continuar.";
 
 /* dores do mercado (base da tela "Por que um app só seu") */
 const DORES = [
   {dor:"O aluno abre o app e vê a marca dos outros", porque:"Nos apps de plataforma (MFIT, Tecnofit, Trainerize…), o aluno baixa o app da plataforma. Ter app com a marca do próprio personal costuma ser um plano à parte, mais caro.", aqui:"Nome, cor e ícone do Jorge na tela do celular do aluno."},
   {dor:"Esquece a carga da última vez", porque:"Sem histórico à mão, o aluno repete carga, perde progressão e anota no bloco de notas ou nem anota.", aqui:"Cada série já vem preenchida com a carga da última vez, e o app comemora o recorde."},
-  {dor:"Check-in no Google Forms ou no WhatsApp", porque:"Nos fóruns do Trainerize, coaches pedem há anos um check-in dentro do app; muitos usam formulário externo e o aluno esquece o dia.", aqui:"Check-in semanal no próprio app, com lembrete, e a resposta do Jorge volta pra lá."},
-  {dor:"O personal só percebe que o aluno sumiu quando ele cancela", porque:"Com 20 alunos no WhatsApp, quem para de treinar desaparece da conversa sem ninguém notar.", aqui:"O painel avisa quem está há 5 dias sem treinar, com check-in atrasado ou com dor, e já tem a mensagem pronta."},
+  {dor:"Montar treino de um em um, toda quinzena", porque:"Nos apps genéricos e no WhatsApp, o personal reescreve o treino de cada aluno do zero a cada troca. Com 20 alunos e troca quinzenal, são 40 treinos por mês.", aqui:"Botão “Próxima quinzena”: copia o treino com a progressão (mais repetição, mais carga ou mais série) e o Jorge só ajusta. Modelo aplicado a vários alunos de uma vez."},
+  {dor:"O personal só percebe que o aluno sumiu quando ele cancela", porque:"Com 20 alunos no WhatsApp, quem para de treinar desaparece da conversa sem ninguém notar.", aqui:"O painel avisa quem está há 5 dias sem treinar, com dor ou com reavaliação vencida, e já tem a mensagem pronta."},
   {dor:"Cobrança na mão e no constrangimento", porque:"Planilha, lembrete no celular, mensagem de cobrança escrita do zero todo mês.", aqui:"Lista de vencimentos e cobrança com Pix em um toque, num tom educado."},
   {dor:"Aparelho ocupado, academia lotada", porque:"O aluno improvisa a troca e às vezes troca por algo que nem trabalha o mesmo músculo.", aqui:"Botão “Trocar” com as substituições que o próprio Jorge aprovou."},
   {dor:"Não deu pra ir à academia, o treino foi pro lixo", porque:"Viagem, chuva, filho doente: o treino da academia não serve, e a semana se perde.", aqui:"Plano B pronto: treino em casa sem equipamento e treino ao ar livre."},
@@ -215,5 +250,5 @@ const DORES = [
   {dor:"Paga por aluno, todo mês", porque:"Plataformas cobram mensalidade que cresce com o número de alunos, e os dados ficam nelas.", aqui:"Custo fixo de infraestrutura, e os dados dos alunos são do Jorge."}
 ];
 
-return {MARCA, EX, METODOS, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
+return {MARCA, EX, METODOS, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
 })();

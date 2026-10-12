@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 const D = window.DADOS;
-const {MARCA, EX, METODOS, MODELOS, ALUNOS, HABITOS, DORES} = D;
+const {MARCA, EX, METODOS, PLANOS, PARQ, TERMO, MODELOS, ALUNOS, DORES} = D;
 
 /* ================= utilidades ================= */
 const $ = id => document.getElementById(id);
@@ -50,19 +50,20 @@ const ICON = {
   painel:'<path d="M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z"/>',
   alunos:'<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 12 0v1M16 3.5a4 4 0 0 1 0 7.5M22 21v-1a6 6 0 0 0-4-5.6"/>',
   grana:'<path d="M12 2.5v19M16.5 6.5c-.9-1.3-2.5-2-4.5-2-2.8 0-4.5 1.4-4.5 3.4 0 4.6 9.5 2.6 9.5 7.6 0 2-1.9 3.5-5 3.5-2.3 0-4.2-.8-5.1-2.4"/>',
-  ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>'
+  ok:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  perfil:'<path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM4 21v-1a8 8 0 0 1 16 0v1"/>'
 };
 const svg = (k, cls="") => `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true">${ICON[k]}</svg>`;
 
 /* ================= estado ================= */
-const CHAVE = "jorge-personal:v3";
+const CHAVE = "jorge-personal:v4";
 let S;
 
 function carregar(){
   try {
     const s = JSON.parse(store.get(CHAVE));
     /* demonstração "envelhecida" (aberta muitos dias depois): recomeça com datas novas */
-    if (s && s.v === 3 && diasDesde(s.semente) < 5) return s;
+    if (s && s.v === 4 && diasDesde(s.semente) < 5) return s;
   } catch(e){}
   return null;
 }
@@ -115,8 +116,12 @@ const gruposDe = t => [...new Set(t.exs.map(e => ex(e.id).grupo).filter(g => g &
 
 function semear(){
   const h = hoje0(), r = rng(20261009);
-  const s = {v:3, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], checkins:[], treinos:{}, programa:{},
-    venc:{}, pagos:{}, habitos:{}, fotos:[], exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2))};
+  const s = {v:4, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], checkins:[], treinos:{}, programa:{},
+    venc:{}, pagos:{}, fotos:[], exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2)),
+    /* cadastro: o aluno se inscreve e o Jorge aprova */
+    pendentes: D.PENDENTES.map(p => Object.assign({}, p, {data: iso(addDias(h, -p.diasAtras)), termo: iso(addDias(h, -p.diasAtras))})),
+    novos:[], suspensos:{}, exclusao:[], meuCadastro:null,
+    termoAceito: iso(addDias(h, -240))};
   /* troca quinzenal: cada aluno numa altura da quinzena (alguns já passaram da data) */
   ALUNOS.forEach((a, i) => { s.venc[a.id] = iso(addDias(h, a.venc)); s.troca[a.id] = iso(addDias(h, a.id === "marina" ? 9 : (i*5) % 17 - 2)); });
 
@@ -227,8 +232,7 @@ function melhorCarga(id, exId){
 function dorRecente(id){
   const ss = sessoesDe(id).filter(s => s.dor && diasDesde(s.data) <= 7);
   if (ss.length) return ss[ss.length-1].dor;
-  const c = ultimoCheckin(id);
-  return c && c.dor && diasDesde(c.data) <= 10 && !c.resposta ? c.dor : null;
+  return null;
 }
 function sequenciaSemanas(id){
   const meta = aluno(id).meta; let n = 0;
@@ -245,15 +249,14 @@ function alertas(){
   const out = [];
   ALUNOS.forEach(a => {
     const p = primeiro(a.nome), ult = ultimoTreinoDias(a.id), v = diasAteVenc(a.id);
-    const c = ultimoCheckin(a.id), ck = c ? diasDesde(c.data) : 99, dor = dorRecente(a.id);
+    const dor = dorRecente(a.id), novo = !sessoesDe(a.id).length;
     if (dor) out.push({a, nivel:3, ic:"🩹", cls:"bad", t:`Relatou dor: ${dor}`,
       msg:`Oi ${p}! Vi que você sentiu dor (${dor.toLowerCase()}). Me conta melhor: dói em qual movimento? Até a gente conversar, pula o exercício que incomodou.`});
-    if (ult >= 5) out.push({a, nivel: ult >= 9 ? 3 : 2, ic:"💤", cls: ult >= 9 ? "bad" : "warn", t:`${ult} dias sem treinar`,
+    if (S.suspensos[a.id]) return;
+    if (ult >= 5 && !novo) out.push({a, nivel: ult >= 9 ? 3 : 2, ic:"💤", cls: ult >= 9 ? "bad" : "warn", t:`${ult} dias sem treinar`,
       msg:`Oi ${p}, tudo bem? Senti sua falta nos treinos esses dias. Aconteceu alguma coisa? Se a rotina apertou, te mando um treino mais curto pra encaixar. 💪`});
     if (v < 0) out.push({a, nivel:3, ic:"💸", cls:"bad", t:`Mensalidade atrasada há ${plural(-v,"dia")}`, msg:msgCobranca(a, v)});
     else if (v <= 3) out.push({a, nivel:1, ic:"📅", cls:"warn", t: v === 0 ? "Mensalidade vence hoje" : `Mensalidade vence em ${plural(v,"dia")}`, msg:msgCobranca(a, v)});
-    if (ck >= 10) out.push({a, nivel:1, ic:"📝", cls:"warn", t:`Check-in atrasado (${ck} dias)`,
-      msg:`Oi ${p}! Bora fazer o check-in da semana? Leva 1 minuto no app e me ajuda a ajustar teu treino.`});
   });
   /* um cartão por aluno: o motivo mais grave na frente, os outros juntos */
   const porAluno = new Map();
@@ -263,7 +266,6 @@ function alertas(){
   });
   return [...porAluno.values()];
 }
-const checkinsPendentes = () => S.checkins.filter(c => !c.resposta).sort((a,b) => b.ts - a.ts);
 
 /* ================= gráfico ================= */
 function grafico(pts, {h = 150, casas = 1, unid = ""} = {}){
@@ -314,10 +316,11 @@ function telaEntrada(){
   e.innerHTML = `<div class="entrada-in">
     <div class="marca-g"><span class="logo">${esc(MARCA.iniciais)}</span><div><h1>${esc(MARCA.nome)}</h1><p class="muted">${esc(MARCA.slogan)}</p></div></div>
     <p class="lead">Protótipo pra mostrar a ideia. Escolha como quer ver o app:</p>
-    <button type="button" class="papel" data-a="papel" data-p="aluno"><span class="ico">🏋️‍♀️</span><span><b>Sou aluna</b><span class="muted small">Ver como a Marina vê: treino do dia, cargas, check-in e evolução</span></span><span class="seta">›</span></button>
-    <button type="button" class="papel" data-a="papel" data-p="jorge"><span class="ico">📋</span><span><b>Sou o Jorge</b><span class="muted small">Painel do treinador: 20 alunos, alertas, montar treino e cobrança</span></span><span class="seta">›</span></button>
+    <button type="button" class="papel" data-a="cadastro"><span class="ico">✍️</span><span><b>Quero ser aluno</b><span class="muted small">Cadastro, anamnese, PAR-Q e termo. O Jorge aprova antes de liberar o app</span></span><span class="seta">›</span></button>
+    <button type="button" class="papel" data-a="papel" data-p="aluno"><span class="ico">🏋️‍♀️</span><span><b>Sou aluna</b><span class="muted small">Ver como a Marina vê: treino do dia com cadência, RIR e bi-set, cargas e Pix</span></span><span class="seta">›</span></button>
+    <button type="button" class="papel" data-a="papel" data-p="jorge"><span class="ico">📋</span><span><b>Sou o Jorge</b><span class="muted small">Painel do treinador: aprovar cadastros, alertas, montar treino, avaliação e cobrança</span></span><span class="seta">›</span></button>
     <button type="button" class="papel destaque" data-a="dores"><span class="ico">💡</span><span><b>Por que um app só seu?</b><span class="muted small">As dores dos apps de consultoria que já existem, e o que este resolve</span></span><span class="seta">›</span></button>
-    <div class="demo"><span>🎬</span><span><b>Roteiro de demonstração:</b> entre como aluna, faça um treino e mande o check-in. Depois troque pro Jorge (botão no canto de cima) e veja tudo chegando no painel.</span></div>
+    <div class="demo"><span>🎬</span><span><b>Roteiro de demonstração:</b> faça um cadastro em “Quero ser aluno”, depois entre como o Jorge e aprove. Ou entre como aluna, faça um treino e troque pro Jorge (botão no canto de cima) pra ver chegando no painel.</span></div>
     <div class="rodape stack">
       <button type="button" class="lnk" data-a="instalar">Como instalar no celular</button>
       <span class="tiny muted">Dados fictícios · nada aqui é de aluno real</span>
@@ -329,10 +332,11 @@ function telaEntrada(){
 
 /* ================= abas ================= */
 const ABAS = {
-  aluno: [["hoje","Hoje","casa"],["treinos","Treinos","peso"],["evolucao","Evolução","graf"],["checkin","Check-in","check"]],
+  aluno: [["hoje","Hoje","casa"],["treinos","Treinos","peso"],["perfil","Perfil","perfil"]],
   jorge: [["painel","Painel","painel"],["alunos","Alunos","alunos"],["montar","Treinos","peso"],["financeiro","Financeiro","grana"]]
 };
 const sub = {};  // sub-abas (segmentos) de cada tela
+const EU = "marina";
 const filtro = {busca:"", tipo:"todos"};
 
 function render(){
@@ -341,24 +345,22 @@ function render(){
   const p = S.papel, aba = S.aba[p];
   $("top-logo").textContent = MARCA.iniciais;
   $("troca-txt").textContent = p === "aluno" ? "Marina" : "Jorge";
-  const badge = {checkin: checkinDevido() ? "1" : "", painel: checkinsPendentes().length || ""};
+  const badge = {painel: (S.pendentes.length + S.exclusao.filter(x => !x.feito).length) || ""};
   $("tabbar").innerHTML = ABAS[p].map(([id, nome, ic]) =>
     `<button type="button" data-a="aba" data-v="${id}"${id === aba ? ' aria-current="page"' : ""}>${svg(ic)}<span>${nome}</span>${badge[id] ? `<b class="dot">${badge[id]}</b>` : ""}</button>`).join("");
-  const V = {hoje:vHoje, treinos:vTreinos, evolucao:vEvolucao, checkin:vCheckin, painel:vPainel, alunos:vAlunos, montar:vMontar, financeiro:vFinanceiro}[aba];
+  const V = {hoje:vHoje, treinos:vTreinos, perfil:vPerfil, painel:vPainel, alunos:vAlunos, montar:vMontar, financeiro:vFinanceiro}[aba] || (S.aba[p] = ABAS[p][0][0], vHoje);
   const r = V();
   $("top-sub").textContent = r.sub; $("top-tit").textContent = r.tit;
   $("tela").innerHTML = r.html;
   if (S.exec) desenharExec();
 }
 function irAba(v){ S.aba[S.papel] = v; salvar(); render(); $("main").scrollTop = 0; }
-const segm = (chave, opcoes) => `<div class="seg" role="group">${opcoes.map(([v, n]) =>
-  `<button type="button" data-a="seg" data-k="${chave}" data-v="${v}" aria-pressed="${(sub[chave] || opcoes[0][0]) === v}">${n}</button>`).join("")}</div>`;
+const segm = (chave, opcoes, folha) => `<div class="seg" role="group">${opcoes.map(([v, n]) =>
+  `<button type="button" data-a="${folha ? "segF" : "seg"}" data-k="${chave}" data-v="${v}" aria-pressed="${(sub[chave] || opcoes[0][0]) === v}">${n}</button>`).join("")}</div>`;
 const segAtual = (chave, padrao) => sub[chave] || padrao;
 const dataHoje = () => { const h = hoje0(); return `${SEM_L[dow(h)]}, ${h.getDate()} de ${MESES[h.getMonth()]}`; };
 
 /* ================= ALUNO · Hoje ================= */
-const EU = "marina";
-function checkinDevido(){ const c = ultimoCheckin(EU); return !c || diasDesde(c.data) >= 7; }
 
 function vHoje(){
   const a = aluno(EU), h = hoje0(), ses = sessoesSemana(EU);
@@ -383,7 +385,6 @@ function vHoje(){
       <div class="btns"><button type="button" class="btn pri" data-a="comecar" data-l="${esc(prox.letra)}">Começar treino</button><button type="button" class="btn inv" data-a="verTreino" data-l="${esc(prox.letra)}" style="flex:0 0 auto">Ver</button></div></div>`;
   }
   const dots = SEM.map((n,i) => `<span class="d${feitos.has(i) ? " feito" : ""}${i === dow(h) ? " hoje" : ""}"><i>${feitos.has(i) ? svg("ok").replace('viewBox','style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:3" viewBox') : n[0]}</i>${n}</span>`).join("");
-  const habH = S.habitos[iso(h)] || {};
   const v = diasAteVenc(EU);
   const html = `
     <div class="card">
@@ -397,18 +398,14 @@ function vHoje(){
       <button type="button" data-a="comecar" data-l="Casa"><span class="e">🏠</span><b>Treino em casa</b><span class="small muted">Sem equipamento · ${durEst(D.T_CASA)} min</span></button>
       <button type="button" data-a="comecar" data-l="Rua"><span class="e">🌳</span><b>Ao ar livre</b><span class="small muted">Praça ou praia · ${durEst(D.T_LIVRE)} min</span></button>
     </div>
-    ${checkinDevido() ? `<button type="button" class="card row" data-a="aba" data-v="checkin" style="text-align:left;border-color:var(--accent)">
-      <span class="ic acc">📝</span><span class="grow"><b>Check-in da semana</b><br><span class="small muted">Leva 1 minuto. O Jorge responde até amanhã.</span></span><span class="seta muted">›</span></button>` : ""}
     <div class="card">
       <div class="row sb"><span class="eyebrow">Recado do ${esc(MARCA.curto)} · ${quando(S.recadoData)}</span></div>
       <div class="recado"><span class="logo sm">${esc(MARCA.iniciais)}</span><p class="bolha">${esc(S.recado)}</p></div>
       <a class="lnk small" href="${wa("Oi Jorge! Sobre o recado: ")}" target="_blank" rel="noopener">Responder no WhatsApp ›</a>
     </div>
-    <div class="sec"><h2>Hábitos de hoje</h2><span class="small muted">${Object.values(habH).filter(Boolean).length} de ${HABITOS.length}</span></div>
-    <div class="habitos">${HABITOS.map(x => `<button type="button" class="hab" data-a="habito" data-id="${x.id}" aria-pressed="${!!habH[x.id]}"><span class="e">${x.icone}</span>${esc(x.nome.split(" ")[0])}<span class="tiny">${esc(x.meta)}</span></button>`).join("")}</div>
     <div class="card row flat">
       <span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span>
-      <span class="grow"><b>Plano ${esc(a.tipo)}</b><br><span class="small muted">${v < 0 ? `Venceu há ${plural(-v,"dia")}` : v === 0 ? "Vence hoje" : `Vence em ${plural(v,"dia")} (${ddmm(deIso(S.venc[EU]))})`}</span></span>
+      <span class="grow"><b>Plano mensal · ${reais(a.valor)}</b><br><span class="small muted">${v < 0 ? `Venceu há ${plural(-v,"dia")}` : v === 0 ? "Vence hoje" : `Vence em ${plural(v,"dia")} (${ddmm(deIso(S.venc[EU]))})`}</span></span>
       <button type="button" class="btn sm" data-a="pix">Pagar com Pix</button>
     </div>`;
   return {sub: dataHoje(), tit: `Oi, ${primeiro(a.nome)}`, html};
@@ -514,12 +511,16 @@ function historicoEx(ss, exId){
   return ss.map(s => { const k = s.series.filter(z => z.ex === exId && z.kg != null); return k.length ? {s, kg:Math.max(...k.map(z => z.kg)), series:s.series.filter(z => z.ex === exId)} : null; }).filter(Boolean);
 }
 
-function vEvolucao(){
-  const s = segAtual("evo","desemp");
-  let html = segm("evo", [["desemp","Desempenho"],["cargas","Cargas"],["freq","Frequência"],["fotos","Fotos"]]);
-  const ss = sessoesDe(EU);
-  html += s === "desemp" ? evoDesempenho(ss) : s === "cargas" ? evoCargas(ss) : s === "freq" ? evoFreq(ss) : evoFotos();
-  return {sub:"Seu progresso", tit:"Evolução", html};
+/* evolução completa de um aluno (só o Jorge vê) */
+let EVO = EU;
+function folhaEvolucao(id){
+  EVO = id;
+  abrirFolha(`Evolução · ${primeiro(aluno(id).nome)}`, () => {
+    const s = segAtual("evo","desemp"), ss = sessoesDe(EVO);
+    if (!ss.length) return `<div class="vazio">${esc(primeiro(aluno(EVO).nome))} ainda não registrou treino. A evolução aparece depois dos primeiros treinos.</div>`;
+    return segm("evo", [["desemp","Desempenho"],["cargas","Cargas"],["freq","Frequência"]], true)
+      + (s === "desemp" ? evoDesempenho(ss) : s === "cargas" ? evoCargas(ss) : evoFreq(ss));
+  });
 }
 
 function evoDesempenho(ss){
@@ -536,8 +537,8 @@ function evoDesempenho(ss){
     return {id, de:h[0].kg, para:h[h.length-1].kg, p:pct(h[h.length-1].kg, h[0].kg)};
   }).filter(Boolean).sort((a,b) => b.p - a.p);
   const forca = evol.length ? Math.round(evol.reduce((m,e) => m + e.p, 0)/evol.length) : 0;
-  const semAtual = sem[11], meta = aluno(EU).meta;
-  const cs = checkinsDe(EU);
+  const semAtual = sem[11], meta = aluno(EVO).meta;
+  const cs = checkinsDe(EVO);
   const pts = cs.filter(c => c.peso).map(c => ({x:ddmm(deIso(c.data)), y:c.peso}));
   const cin = cs.filter(c => c.cintura).map(c => ({x:ddmm(deIso(c.data)), y:c.cintura}));
   const dp = pts.length > 1 ? pts[pts.length-1].y - pts[0].y : 0;
@@ -553,7 +554,7 @@ function evoDesempenho(ss){
       <div class="kpi"><b>${fmt(rpe,1)}<small class="muted" style="font-size:.9rem">/10</small></b><span>esforço médio dos treinos</span></div>
       <div class="kpi"><b>${fmt(horas,0)}h</b><span>treinando em 30 dias</span></div>
     </div>
-    <div class="sec"><h2>Quem mais evoluiu</h2><button type="button" class="lnk" data-a="seg" data-k="evo" data-v="cargas">Ver todas ›</button></div>
+    <div class="sec"><h2>Quem mais evoluiu</h2><button type="button" class="lnk" data-a="segF" data-k="evo" data-v="cargas">Ver todas ›</button></div>
     <div class="lista">${evol.slice(0,4).map((e,i) => `<div class="it"><span class="ic acc" style="font-weight:900">${i+1}º</span>
       <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(ex(e.id).nome)}</span><span class="s">${fmt(e.de)} → <b style="color:var(--ink)">${fmt(e.para)} kg</b></span></span>
       ${mini(historicoEx(ss, e.id).map(h => h.kg), 70, 28)}<span class="chip ok">${sinal(e.p)}%</span></div>`).join("")}</div>
@@ -564,7 +565,7 @@ function evoDesempenho(ss){
 }
 
 function evoCargas(ss){
-  const ts = treinosDe(EU);
+  const ts = treinosDe(EVO);
   return `<p class="small muted">Toque num treino pra ver a carga de cada exercício.</p>` + ts.map(t => {
     const sess = ss.filter(s => s.letra === t.letra);
     const vols = sess.map(s => s.volume), dv = vols.length > 1 ? pct(vols[vols.length-1], vols[0]) : 0;
@@ -620,17 +621,17 @@ function evoFreq(ss){
         <span class="small muted">${s.dur} min · ${s.series.length} séries · ${ton(s.volume)} · esforço ${s.rpe}/10</span></span></div>
       ${s.prs.length ? `<div class="chips">${s.prs.map(id => `<span class="chip acc">🏆 ${esc(ex(id).nome)}</span>`).join("")}</div>` : ""}
       ${s.dor ? `<span class="chip bad" style="align-self:flex-start">🩹 ${esc(s.dor)}</span>` : ""}
-      ${s.coment ? `<div class="recado"><span class="av" style="--c:${corDe(EU)}">${esc(iniciais(aluno(EU).nome))}</span><p class="bolha">${esc(s.coment)}</p></div>` : ""}
+      ${s.coment ? `<div class="recado"><span class="av" style="--c:${corDe(EVO)}">${esc(iniciais(aluno(EVO).nome))}</span><p class="bolha">${esc(s.coment)}</p></div>` : ""}
       <button type="button" class="btn sm" data-a="verSessao" data-id="${s.id}" style="align-self:flex-start">Ver as séries</button>`).join("")
     : `<p class="muted">${dSel > h ? "Esse dia ainda não chegou." : "Dia sem treino. Descanso também faz parte 😴"}</p>`}</div>`;
-  const m30 = ss.filter(x => diasDesde(x.data) < 30).length, meta = aluno(EU).meta;
+  const m30 = ss.filter(x => diasDesde(x.data) < 30).length, meta = aluno(EVO).meta;
   const sem = semanasDe(ss).reverse();
   return `<div class="card"><div class="row sb"><span class="eyebrow">Últimas 12 semanas</span><span class="tiny muted">toque num dia</span></div>
       <div class="heat2">${grade}</div>
       <div class="row tiny muted" style="gap:14px"><span class="row" style="gap:5px"><i class="hc on" style="width:12px;display:inline-block"></i>treinou (letra do treino)</span><span class="row" style="gap:5px"><i class="hc" style="width:12px;display:inline-block"></i>descanso</span></div></div>
     ${detalhe}
     <div class="kpis"><div class="kpi"><b>${m30}</b><span>treinos em 30 dias</span></div><div class="kpi"><b>${fmt(m30/30*7,1)}</b><span>treinos por semana</span></div>
-      <div class="kpi"><b>${sequenciaSemanas(EU)}</b><span>semanas seguidas na meta</span></div><div class="kpi"><b>${Math.round(aderencia(EU)*100)}%</b><span>aderência ao plano</span></div></div>
+      <div class="kpi"><b>${sequenciaSemanas(EVO)}</b><span>semanas seguidas na meta</span></div><div class="kpi"><b>${Math.round(aderencia(EVO)*100)}%</b><span>aderência ao plano</span></div></div>
     <div class="sec"><h2>Semana a semana</h2></div>
     <div class="lista">${sem.map(s => `<details class="dt semdet"${s.w === 0 ? " open" : ""}><summary class="it">
         <span class="grow stack" style="gap:1px"><span class="t">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `${ddmm(s.ini)} a ${ddmm(addDias(s.ini,6))}`}</span><span class="s">${ton(s.vol)} · ${fmt(s.min/60,1)}h treinando</span></span>
@@ -652,52 +653,139 @@ function evoFotos(){
     <div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`;
 }
 
-/* ================= ALUNO · Check-in ================= */
-const CK = {};  // rascunho do check-in
-const ESC5 = {sono:["😫","😪","😐","🙂","😴"], energia:["🪫","😮‍💨","😐","💪","⚡"], estresse:["😌","🙂","😐","😣","🤯"], dieta:["🍔","😬","😐","🥗","🏆"]};
-const ROT5 = {sono:["Péssimo","Ruim","Ok","Bom","Ótimo"], energia:["Zerada","Baixa","Ok","Boa","Voando"], estresse:["Zen","Baixo","Médio","Alto","No limite"], dieta:["Ruim","Fraca","Ok","Boa","Perfeita"]};
-function escala(campo, titulo){
-  return `<div class="campo"><span class="lbl">${titulo}</span><div class="escala">${ESC5[campo].map((e,i) =>
-    `<button type="button" data-a="ck" data-c="${campo}" data-v="${i+1}" aria-pressed="${CK[campo] === i+1}" aria-label="${ROT5[campo][i]}">${e}<small>${ROT5[campo][i]}</small></button>`).join("")}</div></div>`;
+/* ================= ALUNO · Perfil ================= */
+function vPerfil(){
+  const a = aluno(EU), v = diasAteVenc(EU), exc = S.exclusao.find(x => x.aluno === EU && !x.feito);
+  const html = `<div class="card row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><b style="font-size:1.1rem">${esc(a.nome)}</b>
+      <span class="small muted">${esc(a.tipo)} · ${esc(a.objetivo)}</span></div></div>
+    <div class="card row flat"><span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span>
+      <span class="grow"><b>Plano mensal · ${reais(a.valor)}</b><br><span class="small muted">${v < 0 ? `Venceu há ${plural(-v,"dia")}` : v === 0 ? "Vence hoje" : `Próximo vencimento ${ddmm(deIso(S.venc[EU]))}`}</span></span>
+      <button type="button" class="btn sm" data-a="pix">Pagar</button></div>
+    <div class="sec"><h2>Meus documentos</h2></div>
+    <div class="lista">
+      <button type="button" class="it" data-a="verTermo"><span class="ic ok">✅</span><span class="grow stack" style="gap:1px"><span class="t">Termo de consentimento</span><span class="s">Aceito em ${ddmm(deIso(S.termoAceito))}/${deIso(S.termoAceito).getFullYear()}</span></span><span class="seta">›</span></button>
+      <button type="button" class="it" data-a="verFicha" data-id="${EU}"><span class="ic">🩺</span><span class="grow stack" style="gap:1px"><span class="t">Anamnese e PAR-Q</span><span class="s">O que você contou no cadastro</span></span><span class="seta">›</span></button>
+    </div>
+    <div class="sec"><h2>Seus dados</h2></div>
+    <p class="small muted">Seus dados de saúde, fotos e avaliações são vistos só pelo ${esc(MARCA.curto)}. Ficam guardados até você pedir pra apagar.</p>
+    <div class="lista">
+      <button type="button" class="it" data-a="baixarDados"><span class="ic info">⬇️</span><span class="grow stack" style="gap:1px"><span class="t">Baixar uma cópia dos meus dados</span><span class="s">Arquivo com cadastro, treinos e cargas</span></span></button>
+      ${exc ? `<div class="it"><span class="ic warn">⏳</span><span class="grow stack" style="gap:1px"><span class="t">Pedido de exclusão enviado</span><span class="s">Em ${ddmm(deIso(exc.data))}. O ${esc(MARCA.curto)} confirma por aqui.</span></span></div>`
+        : `<button type="button" class="it" data-a="pedirExclusao"><span class="ic bad">🗑️</span><span class="grow stack" style="gap:1px"><span class="t" style="color:var(--bad)">Pedir pra apagar meus dados</span><span class="s">Encerra a consultoria e apaga tudo</span></span></button>`}
+    </div>
+    <button type="button" class="lnk small" data-a="instalar" style="align-self:flex-start">Como instalar o app no celular</button>`;
+  return {sub:"Sua conta", tit:"Perfil", html};
 }
-function vCheckin(){
-  const cs = checkinsDe(EU), ult = cs[cs.length-1], devido = checkinDevido();
-  if (CK.peso == null){ CK.peso = ult ? ult.peso : 65; CK.cintura = ult && ult.cintura ? ult.cintura : 72; }
-  const nSem = sessoesDe(EU).filter(s => diasDesde(s.data) < 7).length;
-  let html = "";
-  if (devido || sub.ckForcar){
-    html += `<div class="card"><span class="eyebrow">Check-in da semana ${cs.length + 1}</span>
-      <p class="small muted">Responde com sinceridade: é isso que faz o ${esc(MARCA.curto)} ajustar teu treino. Leva 1 minuto.</p></div>
-      <div class="card">
-        <div class="campo"><span class="lbl">Peso (em jejum)</span><div class="passo"><button type="button" data-a="passo" data-c="peso" data-d="-0.1">−</button><input inputmode="decimal" data-in="ck" data-c="peso" value="${fmt(CK.peso)}"><button type="button" data-a="passo" data-c="peso" data-d="0.1">+</button></div></div>
-        <div class="campo"><span class="lbl">Cintura (na altura do umbigo)</span><div class="passo"><button type="button" data-a="passo" data-c="cintura" data-d="-0.5">−</button><input inputmode="decimal" data-in="ck" data-c="cintura" value="${fmt(CK.cintura)}"><button type="button" data-a="passo" data-c="cintura" data-d="0.5">+</button></div></div>
-      </div>
-      <div class="card">${escala("sono","Como foi o sono?")}${escala("energia","Energia nos treinos")}${escala("estresse","Estresse da semana")}${escala("dieta","Alimentação")}</div>
-      <div class="card">
-        <div class="campo"><span class="lbl">Treinos</span><p class="small">O app já contou: <b>${plural(nSem,"treino")}</b> nos últimos 7 dias.</p></div>
-        <div class="campo"><span class="lbl">Sentiu alguma dor?</span>
-          <div class="chips"><button type="button" class="chip" data-a="ck" data-c="temDor" data-v="0" aria-pressed="${CK.temDor === 0}">Não</button><button type="button" class="chip" data-a="ck" data-c="temDor" data-v="1" aria-pressed="${CK.temDor === 1}">Sim</button></div>
-          ${CK.temDor === 1 ? `<input class="inp" data-in="ck" data-c="dor" placeholder="Onde? Ex.: joelho esquerdo no agachamento" value="${esc(CK.dor || "")}">` : ""}</div>
-        <div class="campo"><label for="ck-c">Como foi a semana?</label><textarea id="ck-c" class="inp" data-in="ck" data-c="coment" placeholder="O que foi bem, o que travou, alguma dúvida pro ${esc(MARCA.curto)}…">${esc(CK.coment || "")}</textarea></div>
-      </div>
-      <button type="button" class="btn pri full" data-a="enviarCk">Enviar check-in pro ${esc(MARCA.curto)}</button>`;
-  } else {
-    const prox = 7 - diasDesde(ult.data);
-    html += `<div class="card row"><span class="ic ok">✅</span><span class="grow"><b>Check-in em dia</b><br><span class="small muted">Próximo em ${plural(prox,"dia")} (${SEM_L[dow(addDias(deIso(ult.data),7))]}).</span></span></div>
-      <button type="button" class="lnk small" data-a="ckForcar" style="align-self:flex-start">Fazer um check-in extra agora</button>`;
-  }
-  html += `<div class="sec"><h2>Conversa dos check-ins</h2></div>`;
-  html += cs.slice().reverse().slice(0,6).map(c => blocoCheckin(c, "aluno")).join("");
-  return {sub:"Toda semana, 1 minuto", tit:"Check-in", html};
+function folhaTermo(){
+  abrirFolha("Termo de consentimento", () => `<ol class="small termo">${TERMO.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+    <p class="tiny muted">Texto de exemplo do protótipo. O definitivo passa por um advogado antes do lançamento.</p>`, true);
 }
-function blocoCheckin(c, visao){
-  const a = aluno(c.aluno), eu = visao === "aluno";
-  return `<div class="stack" style="gap:8px">
-    <div class="msg ${eu ? "eu" : "ele"}"><span class="q">${eu ? "Você" : esc(primeiro(a.nome))} · ${quando(c.data)}</span>
-      <div class="b"><b>${fmt(c.peso)} kg</b>${c.cintura ? ` · ${fmt(c.cintura)} cm` : ""} · sono ${ESC5.sono[c.sono-1]} · energia ${ESC5.energia[c.energia-1]} · comida ${ESC5.dieta[c.dieta-1]}${c.dor ? `<br>🩹 ${esc(c.dor)}` : ""}${c.coment ? `<br>${esc(c.coment)}` : ""}</div></div>
-    ${c.resposta ? `<div class="msg ${eu ? "ele" : "eu"}"><span class="q">${esc(MARCA.curto)} · ${quando(c.respData)}</span><div class="b">${esc(c.resposta)}</div></div>`
-      : eu ? `<div class="msg ele"><span class="q">${esc(MARCA.curto)}</span><div class="b muted">Vai responder em breve…</div></div>` : ""}
-  </div>`;
+/* ficha de cadastro (anamnese + PAR-Q) de um aluno ou de um cadastro pendente */
+function htmlFicha(c){
+  if (!c) return `<div class="vazio">Aluno de antes do app: a anamnese e o PAR-Q dele ficam no primeiro acesso.</div>`;
+  const sims = c.parq.map((r,i) => r ? i : -1).filter(i => i >= 0);
+  return `${sims.length ? `<div class="demo" style="border-color:var(--warn);background:var(--warn-soft)"><span>⚠️</span><span><b>PAR-Q com ${plural(sims.length,"“sim”")}:</b> pedir liberação médica antes de começar.</span></div>`
+      : `<div class="demo" style="border-color:var(--ok);background:var(--ok-soft)"><span>✅</span><span><b>PAR-Q sem nenhum “sim”.</b> Liberado pra começar.</span></div>`}
+    <div class="card flat"><span class="eyebrow">Dados</span>
+      <span class="small">${c.idade} anos · ${c.sx === "F" ? "feminino" : "masculino"} · ${esc(c.tipo)}</span>
+      <span class="small">Objetivo: <b>${esc(c.objetivo)}</b></span>
+      <span class="small muted">${esc(c.whats || "")}${c.email ? " · " + esc(c.email) : ""}</span></div>
+    <div class="card flat"><span class="eyebrow">Anamnese</span>
+      <span class="small"><b>Lesões / cirurgias:</b> ${esc(c.lesoes || "Nenhuma")}</span>
+      <span class="small"><b>Remédios:</b> ${esc(c.remedios || "Nenhum")}</span>
+      <span class="small"><b>Já treina?</b> ${esc(c.rotina || "—")}</span>
+      <span class="small"><b>Dias e horários:</b> ${esc(c.dias || "—")}</span></div>
+    <div class="card flat"><span class="eyebrow">PAR-Q</span>${PARQ.map((q,i) => `<div class="row" style="align-items:flex-start"><span class="chip ${c.parq[i] ? "warn" : "ok"}" style="flex:none">${c.parq[i] ? "Sim" : "Não"}</span><span class="small">${esc(q)}</span></div>`).join("")}</div>
+    <p class="tiny muted">Termo de consentimento aceito em ${ddmm(deIso(c.termo || S.termoAceito))}.</p>`;
+}
+function folhaFicha(id){
+  const a = aluno(id);
+  abrirFolha(`Ficha · ${primeiro(a.nome)}`, () => htmlFicha(a.cad), true);
+}
+
+/* ================= cadastro do aluno ================= */
+const CAD = {parq: PARQ.map(() => null)};
+function folhaCadastro(){
+  abrirFolha("Cadastro", () => `<p class="small muted">Preenche tudo uma vez só. O ${esc(MARCA.curto)} recebe, confere e libera teu acesso.</p>
+    <div class="card"><span class="eyebrow">1 · Seus dados</span>
+      <div class="campo"><label for="cd-nome">Nome completo</label><input id="cd-nome" class="inp" data-in="cad" data-c="nome" value="${esc(CAD.nome || "")}" autocomplete="name"></div>
+      <div class="row" style="gap:8px"><div class="campo grow"><label for="cd-idade">Idade</label><input id="cd-idade" class="inp" inputmode="numeric" data-in="cad" data-c="idade" value="${esc(CAD.idade || "")}"></div>
+        <div class="campo grow"><span class="lbl">Sexo</span><div class="chips">${[["F","Fem."],["M","Masc."]].map(([v,n]) => `<button type="button" class="chip" data-a="cadOp" data-c="sx" data-v="${v}" aria-pressed="${CAD.sx === v}">${n}</button>`).join("")}</div></div></div>
+      <div class="campo"><label for="cd-w">WhatsApp</label><input id="cd-w" class="inp" inputmode="tel" data-in="cad" data-c="whats" value="${esc(CAD.whats || "")}" autocomplete="tel"></div>
+      <div class="campo"><label for="cd-e">E-mail (é o seu login)</label><input id="cd-e" class="inp" inputmode="email" data-in="cad" data-c="email" value="${esc(CAD.email || "")}" autocomplete="email"></div>
+      <div class="campo"><span class="lbl">Como vai treinar?</span><div class="chips">${["Online","Presencial","Híbrido"].map(v => `<button type="button" class="chip" data-a="cadOp" data-c="tipo" data-v="${v}" aria-pressed="${CAD.tipo === v}">${v}</button>`).join("")}</div></div>
+      <div class="campo"><label for="cd-obj">Objetivo</label><input id="cd-obj" class="inp" data-in="cad" data-c="objetivo" value="${esc(CAD.objetivo || "")}" placeholder="Ex.: ganhar massa, emagrecer, correr 10 km"></div></div>
+    <div class="card"><span class="eyebrow">2 · Anamnese</span>
+      <div class="campo"><label for="cd-l">Lesões, dores ou cirurgias</label><textarea id="cd-l" class="inp" data-in="cad" data-c="lesoes" placeholder="Ex.: dor no joelho direito ao agachar">${esc(CAD.lesoes || "")}</textarea></div>
+      <div class="campo"><label for="cd-r">Toma algum remédio?</label><input id="cd-r" class="inp" data-in="cad" data-c="remedios" value="${esc(CAD.remedios || "")}"></div>
+      <div class="campo"><label for="cd-t">Já treina? Há quanto tempo?</label><input id="cd-t" class="inp" data-in="cad" data-c="rotina" value="${esc(CAD.rotina || "")}"></div>
+      <div class="campo"><label for="cd-d">Dias e horários que pode treinar</label><input id="cd-d" class="inp" data-in="cad" data-c="dias" value="${esc(CAD.dias || "")}"></div></div>
+    <div class="card"><span class="eyebrow">3 · PAR-Q (prontidão pra atividade física)</span>
+      ${PARQ.map((q,i) => `<div class="campo"><span class="small">${i+1}. ${esc(q)}</span><div class="chips"><button type="button" class="chip" data-a="cadParq" data-i="${i}" data-v="0" aria-pressed="${CAD.parq[i] === 0}">Não</button><button type="button" class="chip" data-a="cadParq" data-i="${i}" data-v="1" aria-pressed="${CAD.parq[i] === 1}">Sim</button></div></div>`).join("")}
+      ${CAD.parq.includes(1) ? `<div class="demo" style="border-color:var(--warn);background:var(--warn-soft)"><span>🩺</span><span>Tudo bem responder “sim”. O ${esc(MARCA.curto)} só vai pedir uma liberação do seu médico antes de começar.</span></div>` : ""}</div>
+    <div class="card"><span class="eyebrow">4 · Termo de consentimento</span>
+      <ol class="small termo">${TERMO.map(t => `<li>${esc(t)}</li>`).join("")}</ol>
+      <button type="button" class="aceite" data-a="cadOp" data-c="aceite" data-v="${CAD.aceite ? "" : "1"}" aria-pressed="${!!CAD.aceite}"><span class="cx">${CAD.aceite ? "✓" : ""}</span>Li e concordo com o termo</button></div>
+    <button type="button" class="btn pri full" data-a="enviarCadastro">Enviar cadastro pro ${esc(MARCA.curto)}</button>
+    <p class="tiny muted" style="text-align:center">Protótipo: nada sai do seu celular.</p>`, true);
+}
+function enviarCadastro(){
+  const falta = [];
+  if (!(CAD.nome || "").trim()) falta.push("nome");
+  if (!parseInt(CAD.idade)) falta.push("idade");
+  if (!CAD.sx) falta.push("sexo");
+  if (!CAD.tipo) falta.push("como vai treinar");
+  if (!(CAD.objetivo || "").trim()) falta.push("objetivo");
+  if (CAD.parq.includes(null)) falta.push("PAR-Q");
+  if (!CAD.aceite) falta.push("aceite do termo");
+  if (falta.length){ toast("Falta: " + falta.join(", ")); return; }
+  const id = "n_" + uid();
+  S.pendentes.push({id, nome:CAD.nome.trim(), idade:parseInt(CAD.idade), sx:CAD.sx, tipo:CAD.tipo, objetivo:CAD.objetivo.trim(), whats:CAD.whats || "", email:CAD.email || "",
+    parq:CAD.parq.slice(), lesoes:(CAD.lesoes || "").trim(), remedios:(CAD.remedios || "").trim(), rotina:(CAD.rotina || "").trim(), dias:(CAD.dias || "").trim(),
+    data:iso(hoje0()), termo:iso(hoje0())});
+  S.meuCadastro = id; salvar();
+  Object.keys(CAD).forEach(k => delete CAD[k]); CAD.parq = PARQ.map(() => null);
+  abrirFolha("Cadastro enviado", () => `<div class="festa"><span class="em">⏳</span><h2>Aguardando aprovação</h2><p class="muted">O ${esc(MARCA.curto)} recebeu teu cadastro. Quando ele aprovar, teu acesso é liberado e o primeiro treino aparece aqui.</p></div>
+    <div class="demo"><span>🎬</span><span>Pra ver o outro lado: entre como o ${esc(MARCA.curto)}. O cadastro aparece no topo do painel, pra aprovar.</span></div>
+    <button type="button" class="btn pri full" data-a="papel" data-p="jorge">Ver como o ${esc(MARCA.curto)} recebe</button>`, true);
+}
+
+/* ================= JORGE · aprovar cadastro ================= */
+function folhaPendente(id){
+  const c = S.pendentes.find(x => x.id === id); if (!c) return;
+  if (!sub.modeloAprov) sub.modeloAprov = MODELOS[0].id;
+  abrirFolha(`Cadastro · ${primeiro(c.nome)}`, () => `<div class="row">${avatar({id:c.id, nome:c.nome},"lg")}<div class="grow"><b style="font-size:1.1rem">${esc(c.nome)}</b><br><span class="small muted">Pediu acesso ${quando(c.data)}</span></div></div>
+    ${htmlFicha(c)}
+    <div class="campo"><span class="lbl">Começa com qual treino?</span><div class="chips">${todosModelos().map(m => `<button type="button" class="chip" data-a="modeloAprov" data-v="${m.id}" aria-pressed="${sub.modeloAprov === m.id}">${esc(m.nome)}</button>`).join("")}</div>
+      <span class="ajuda">Depois você ajusta no editor. O primeiro pagamento (${reais(PLANOS[0].valor)}) já fica cobrando pra hoje.</span></div>
+    <button type="button" class="btn pri full" data-a="aprovar" data-id="${c.id}">Aprovar e liberar o app</button>
+    <button type="button" class="btn ghost full" data-a="recusar" data-id="${c.id}" style="color:var(--bad)">Recusar cadastro</button>`, true);
+}
+function aprovar(id){
+  const c = S.pendentes.find(x => x.id === id), m = todosModelos().find(x => x.id === sub.modeloAprov) || MODELOS[0], h = hoje0();
+  const a = {id:c.id, nome:c.nome, idade:c.idade, sx:c.sx, tipo:c.tipo, objetivo:c.objetivo, valor:PLANOS[0].valor, plano:"mensal", meta:3, desde:0,
+    modelo: MODELOS.some(x => x.id === m.id) ? m.id : MODELOS[0].id, dor:null, nota:"", peso0:null, peso:null,
+    restricao: [c.lesoes && !/^nenhum/i.test(c.lesoes) ? c.lesoes : "", c.parq.includes(1) ? "PAR-Q com “sim”: pedir liberação médica." : ""].filter(Boolean).join(" "),
+    cad: c, novo:true};
+  ALUNOS.push(a); S.novos.push(a);
+  S.pendentes = S.pendentes.filter(x => x.id !== id);
+  S.treinos[a.id] = clone(m.treinos); S.programa[a.id] = m.nome;
+  S.venc[a.id] = iso(h); S.troca[a.id] = iso(addDias(h, 15));
+  salvar(); fecharFolha(); render();
+  const p = primeiro(a.nome);
+  abrirFolha("Aluno aprovado", () => `<div class="festa"><span class="em">🎉</span><h2>${esc(p)} liberado!</h2><p class="muted">Programa ${esc(m.nome)} · troca em 15 dias</p></div>
+    <p class="small muted">Na versão final ${esc(p)} recebe um aviso no celular na hora. Se quiser, manda também uma mensagem:</p>
+    <a class="btn wa full" href="${wa(`Oi ${p}! Teu cadastro na consultoria foi aprovado 💪 Já pode abrir o app: o primeiro treino tá lá. Qualquer dúvida me chama.`)}" target="_blank" rel="noopener">Avisar no WhatsApp</a>
+    <button type="button" class="btn full" data-a="editarTreino" data-id="${a.id}">Ajustar o treino agora</button>`, true);
+}
+function baixarDados(){
+  const a = aluno(EU);
+  const dados = {aluno:{nome:a.nome, idade:a.idade, tipo:a.tipo, objetivo:a.objetivo}, plano:{valor:a.valor, vencimento:S.venc[EU]},
+    termoAceito:S.termoAceito, treinos:treinosDe(EU), historico:sessoesDe(EU).map(x => ({data:x.data, treino:x.letra, series:x.series, esforco:x.rpe, dor:x.dor, comentario:x.coment}))};
+  const url = URL.createObjectURL(new Blob([JSON.stringify(dados, null, 2)], {type:"application/json"}));
+  const l = document.createElement("a"); l.href = url; l.download = "meus-dados.json"; document.body.appendChild(l); l.click(); l.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("Cópia dos seus dados baixada");
 }
 
 /* ================= treino em andamento ================= */
@@ -919,7 +1007,7 @@ function vPainel(){
   const treinaram = ALUNOS.filter(a => sessoesSemana(a.id).length > 0).length;
   const ad = Math.round(ALUNOS.reduce((m,a) => m + aderencia(a.id), 0)/ALUNOS.length*100);
   const fin = financeiro();
-  const al = alertas(), pend = checkinsPendentes();
+  const al = alertas(), pend = S.pendentes, exc = S.exclusao.filter(x => !x.feito);
   const feed = S.sessoes.slice().sort((a,b) => b.ts - a.ts).slice(0,8);
   const html = `
     <div class="kpis">
@@ -934,11 +1022,13 @@ function vPainel(){
         <span class="ic ${x.cls}">${x.ic}</span><span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.a.nome)}</span><span class="s">${esc(x.t)}</span></span></button>
       <a class="btn wa sm" href="${wa(x.msg)}" target="_blank" rel="noopener" aria-label="Mandar mensagem no WhatsApp">WhatsApp</a></div>`).join("")}</div>
       ${al.length > 6 && !sub.verTodosAl ? `<button type="button" class="lnk small" data-a="verTodosAl" style="align-self:flex-start">Ver todos (${al.length})</button>` : ""}` : `<div class="vazio">Tudo em ordem por aqui 👌</div>`}
-    <div class="sec"><h2>Check-ins pra responder</h2><span class="chip ${pend.length ? "acc" : "ok"}">${pend.length}</span></div>
-    ${pend.length ? `<div class="lista">${pend.map(c => { const a = aluno(c.aluno), ant = checkinsDe(a.id).filter(z => z.ts < c.ts).pop(), dp = ant ? c.peso - ant.peso : null;
-      return `<button type="button" class="it" data-a="responderCk" data-id="${c.id}">${avatar(a)}
-      <span class="grow stack" style="gap:1px"><span class="t">${esc(a.nome)}</span><span class="s ellip">${fmt(c.peso)} kg${dp ? ` (${dp > 0 ? "+" : ""}${fmt(dp)})` : ""} · ${c.dor ? "🩹 " + esc(c.dor) : esc(c.coment || "sem comentário")}</span></span>
-      <span class="r"><span class="tiny muted">${quando(c.data)}</span></span><span class="seta">›</span></button>`; }).join("")}</div>` : `<div class="vazio">Nenhum check-in esperando resposta ✅</div>`}
+    ${pend.length ? `<div class="sec"><h2>Cadastros pra aprovar</h2><span class="chip acc">${pend.length}</span></div>
+    <div class="lista">${pend.map(c => `<button type="button" class="it" data-a="verPendente" data-id="${c.id}">${avatar({id:c.id, nome:c.nome})}
+      <span class="grow stack" style="gap:1px"><span class="t">${esc(c.nome)}</span><span class="s ellip">${esc(c.tipo)} · ${esc(c.objetivo)}${c.parq.includes(1) ? " · ⚠️ PAR-Q" : ""}</span></span>
+      <span class="r"><span class="tiny muted">${quando(c.data)}</span></span><span class="seta">›</span></button>`).join("")}</div>` : ""}
+    ${exc.length ? `<div class="sec"><h2>Pedidos pra apagar dados</h2><span class="chip bad">${exc.length}</span></div>
+    <div class="lista">${exc.map(x => { const a = aluno(x.aluno); return `<div class="it">${avatar(a)}<span class="grow stack" style="gap:1px"><span class="t">${esc(a.nome)}</span><span class="s">Pediu ${quando(x.data)} · LGPD</span></span>
+      <button type="button" class="btn sm" data-a="confirmarExclusao" data-id="${x.aluno}">Confirmar</button></div>`; }).join("")}</div>` : ""}
     <div class="sec"><h2>Atividade recente</h2></div>
     <div class="lista">${feed.map(x => { const a = aluno(x.aluno);
       return `<button type="button" class="it" data-a="verSessao" data-id="${x.id}">${avatar(a)}
@@ -949,30 +1039,11 @@ function vPainel(){
     <button type="button" class="card row" data-a="dores" style="text-align:left"><span class="ic">💡</span><span class="grow"><b>Por que um app só seu?</b><br><span class="small muted">As dores dos apps que já existem</span></span><span class="seta muted">›</span></button>`;
   return {sub: dataHoje(), tit: `${oi}, ${MARCA.curto}`, html};
 }
-function folhaResponder(id){
-  const c = S.checkins.find(z => z.id === id); if (!c) return;
-  const a = aluno(c.aluno);
-  const rapidas = ["Mandou muito bem! Mantém o ritmo 💪","Boa! Semana que vem a gente sobe a carga.","Vamos cuidar do sono: tenta deitar 30 min mais cedo.","Pula o exercício que doeu até a gente conversar. Te chamo no WhatsApp."];
-  abrirFolha(`Check-in · ${primeiro(a.nome)}`, () => {
-    const ant = checkinsDe(a.id).filter(z => z.ts < c.ts).pop();
-    return `<div class="row">${avatar(a,"lg")}<div class="grow"><b style="font-size:1.1rem">${esc(a.nome)}</b><br><span class="small muted">${esc(a.tipo)} · ${esc(a.objetivo)}</span></div></div>
-      <div class="ck-res"><div><b>${fmt(c.peso)}</b>kg${ant ? ` (${c.peso - ant.peso > 0 ? "+" : ""}${fmt(c.peso - ant.peso)})` : ""}</div><div><b>${ESC5.sono[c.sono-1]}</b>sono</div><div><b>${ESC5.energia[c.energia-1]}</b>energia</div>
-        <div><b>${ESC5.estresse[c.estresse-1]}</b>estresse</div><div><b>${ESC5.dieta[c.dieta-1]}</b>comida</div><div><b>${sessoesDe(a.id).filter(s => diasDesde(s.data) < 7).length}/${a.meta}</b>treinos</div></div>
-      ${c.dor ? `<div class="demo" style="border-color:var(--bad);background:var(--bad-soft)"><span>🩹</span><span><b style="color:var(--bad)">Dor:</b> ${esc(c.dor)}</span></div>` : ""}
-      ${c.coment ? `<div class="recado">${avatar(a)}<p class="bolha">${esc(c.coment)}</p></div>` : ""}
-      ${a.restricao ? `<p class="small muted">📌 ${esc(a.restricao)}</p>` : ""}
-      <div class="campo"><span class="lbl">Sua resposta</span>
-        <div class="chips">${rapidas.map((r,i) => `<button type="button" class="chip" data-a="rapida" data-i="${i}">${esc(r.slice(0,26))}…</button>`).join("")}</div>
-        <textarea class="inp" id="resp-txt" placeholder="Escreve pro ${esc(primeiro(a.nome))}…"></textarea></div>
-      <button type="button" class="btn pri full" data-a="enviarResp" data-id="${c.id}">Responder no app</button>
-      <a class="btn wa full" href="${wa(`Oi ${primeiro(a.nome)}! Vi teu check-in. `)}" target="_blank" rel="noopener">Prefiro chamar no WhatsApp</a>`;
-  });
-  folhaResponder.rapidas = rapidas;
-}
-
 /* ================= JORGE · Alunos ================= */
 function statusAluno(a){
   const ult = ultimoTreinoDias(a.id);
+  if (S.suspensos[a.id]) return ["bad","suspenso"];
+  if (!sessoesDe(a.id).length) return ["info","começando"];
   return ult === 0 ? ["ok","treinou hoje"] : ult === 1 ? ["ok","ontem"] : ult < 5 ? ["", `há ${ult} dias`] : [ult >= 9 ? "bad" : "warn", `há ${ult} dias`];
 }
 function vAlunos(){
@@ -990,16 +1061,16 @@ function vAlunos(){
         <span class="grow stack" style="gap:3px"><span class="t ellip">${esc(a.nome)}${atencao.has(a.id) ? " ⚠️" : ""}</span><span class="s ellip">${esc(a.tipo)} · ${esc(a.objetivo)}</span>
         <span class="bar" style="max-width:140px"><i style="width:${Math.round(ad*100)}%;--c:${ad >= .75 ? "var(--ok)" : ad >= .45 ? "var(--warn)" : "var(--bad)"}"></i></span></span>
         <span class="r"><span class="chip ${c}">${t}</span><span class="tiny muted">${Math.round(ad*100)}% aderência</span></span></button>`; }).join("") || `<div class="vazio">Ninguém com esse filtro.</div>`}</div>
-    <button type="button" class="btn full" data-a="novoAluno">+ Convidar aluno novo</button>`;
+    <button type="button" class="btn full" data-a="novoAluno">+ Aluno novo (link de cadastro)</button>`;
   return {sub:`${ALUNOS.length} alunos · ${ALUNOS.filter(a => a.tipo !== "Presencial").length} online`, tit:"Alunos", html};
 }
 function folhaAluno(id){
   const a = aluno(id);
   abrirFolha(a.nome, () => {
-    const v = diasAteVenc(id), [c, t] = statusAluno(a), cs = checkinsDe(id), uc = cs[cs.length-1];
+    const v = diasAteVenc(id), [c, t] = statusAluno(a), cs = checkinsDe(id);
     let pts = cs.filter(z => z.peso).map(z => ({x:ddmm(deIso(z.data)), y:z.peso}));
-    if (pts.length < 3){ const n = 8; pts = Array.from({length:n}, (_,i) => ({x: i === 0 ? `há ${a.desde}m` : i === n-1 ? "agora" : "", y: Math.round((a.peso0 + (a.peso - a.peso0)*(i/(n-1)) + (i && i < n-1 ? Math.sin(i*1.7)*.35 : 0))*10)/10})); }
-    const dp = pts[pts.length-1].y - pts[0].y;
+    if (pts.length < 3 && a.peso0 != null){ const n = 8; pts = Array.from({length:n}, (_,i) => ({x: i === 0 ? `há ${a.desde}m` : i === n-1 ? "agora" : "", y: Math.round((a.peso0 + (a.peso - a.peso0)*(i/(n-1)) + (i && i < n-1 ? Math.sin(i*1.7)*.35 : 0))*10)/10})); }
+    const dp = pts.length ? pts[pts.length-1].y - pts[0].y : 0;
     const semanas = [3,2,1,0].map(w => ({w, n: sessoesSemana(id, w).length}));
     const al = alertas().filter(x => x.a.id === id);
     return `<div class="row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><span class="small muted">${a.idade} anos · aluno há ${plural(a.desde,"mês","meses")}</span>
@@ -1011,8 +1082,8 @@ function folhaAluno(id){
         <p class="small muted">Programa: <b style="color:var(--ink)">${esc(programaDe(id))}</b> · meta ${a.meta}x por semana</p></div>
       <div class="card flat"><span class="eyebrow">Frequência · últimas 4 semanas</span>
         ${semanas.map(s => `<div class="row"><span class="small" style="width:92px">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `Há ${s.w} semanas`}</span><span class="bar grow"><i style="width:${Math.min(100, s.n/a.meta*100)}%;--c:${s.n >= a.meta ? "var(--ok)" : s.w === 0 ? "var(--accent)" : "var(--warn)"}"></i></span><span class="small mono" style="width:30px;text-align:right">${s.n}/${a.meta}</span></div>`).join("")}</div>
-      <div class="card flat"><span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts[pts.length-1].y)} kg</b><span class="delta ${(/emagre|defini/i.test(a.objetivo) ? dp <= 0 : dp >= 0) ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde o início</span></div>${grafico(pts, {h:120})}</div>
-      ${uc ? `<div class="sec"><h2>Último check-in</h2></div>${blocoCheckin(uc, "jorge")}${!uc.resposta ? `<button type="button" class="btn pri full" data-a="responderCk" data-id="${uc.id}">Responder check-in</button>` : ""}` : ""}
+      <div class="btns"><button type="button" class="btn" data-a="verEvolucao" data-id="${id}">📈 Evolução</button><button type="button" class="btn" data-a="verFicha" data-id="${id}">🩺 Ficha</button></div>
+      ${pts.length ? `<div class="card flat"><span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts[pts.length-1].y)} kg</b><span class="delta ${(/emagre|defini/i.test(a.objetivo) ? dp <= 0 : dp >= 0) ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde o início</span></div>${grafico(pts, {h:120})}</div>` : ""}
       <div class="sec"><h2>Últimos treinos</h2></div>
       <div class="lista">${sessoesDe(id).slice(-5).reverse().map(x => `<button type="button" class="it" data-a="verSessao" data-id="${x.id}"><span class="letra-b" style="width:34px;height:34px;font-size:.85rem">${esc(x.letra)}</span>
         <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.nome)}</span><span class="s ellip">${x.coment ? "“" + esc(x.coment) + "”" : `esforço ${x.rpe}/10 · ${x.dur} min`}</span></span><span class="r"><span class="tiny muted">${quando(x.data)}</span>${x.dor ? `<span class="chip bad">dor</span>` : ""}</span></button>`).join("")}</div>
@@ -1244,22 +1315,10 @@ const A = {
   comecar(el){ fecharFolha(); comecar(el.dataset.l); },
   abrirExec, verTreino(el){ sub.treinos = "meus"; sub.abrirTreino = el.dataset.l; irAba("treinos"); },
   verSessao(el){ folhaSessao(el.dataset.id); },
-  habito(el){ const k = iso(hoje0()), h = S.habitos[k] = S.habitos[k] || {}; h[el.dataset.id] = !h[el.dataset.id]; salvar(); render();
-    if (HABITOS.every(x => h[x.id])) toast("Todos os hábitos de hoje feitos! 🎯"); },
   pix: folhaPix,
-  copiar(el){ try { navigator.clipboard.writeText(el.dataset.t); toast("Chave Pix copiada"); } catch(e){ toast("Não deu pra copiar"); } },
+  copiar(el){ try { navigator.clipboard.writeText(el.dataset.t); toast(el.dataset.msg || "Copiado"); } catch(e){ toast("Não deu pra copiar"); } },
   exEvo(el){ sub.exEvo = el.dataset.id; render(); },
-  dia(el){ sub.diaSel = el.dataset.d; render(); const d = $("dia-det"); if (d) d.scrollIntoView({behavior:"smooth", block:"nearest"}); },
-  ck(el){ const c = el.dataset.c, v = +el.dataset.v; CK[c] = v; render(); },
-  passo(el){ const c = el.dataset.c; CK[c] = Math.round(((CK[c] || 0) + +el.dataset.d)*10)/10; render(); },
-  ckForcar(){ sub.ckForcar = true; render(); },
-  enviarCk(){
-    if (!CK.sono || !CK.energia || !CK.estresse || !CK.dieta){ toast("Responde as 4 carinhas antes de enviar 🙂"); return; }
-    S.checkins.push({id:uid(), aluno:EU, data:iso(hoje0()), ts:Date.now(), peso:CK.peso, cintura:CK.cintura, sono:CK.sono, energia:CK.energia,
-      estresse:CK.estresse, dieta:CK.dieta, dor: CK.temDor === 1 ? (CK.dor || "Sem detalhe") : null, coment:(CK.coment || "").trim(), resposta:null, respData:null});
-    Object.keys(CK).forEach(k => delete CK[k]); sub.ckForcar = false;
-    salvar(); render(); $("main").scrollTop = 0; toast("Check-in enviado pro Jorge ✅");
-  },
+  dia(el){ sub.diaSel = el.dataset.d; pilha.length ? desenharFolha() : render(); const d = $("dia-det"); if (d) d.scrollIntoView({behavior:"smooth", block:"nearest"}); },
   sairExec(){ $("exec").hidden = true; pararDescanso(); render(); },
   serie(el){ marcarSerie(+el.dataset.i, +el.dataset.k); },
   dica(el){ const i = el.dataset.i, t = el.dataset.t; S.exec.dicas[i] = S.exec.dicas[i] === t ? null : t; salvar();
@@ -1276,22 +1335,36 @@ const A = {
   fim(el){ FIM[el.dataset.c] = +el.dataset.v; desenharFolha(); },
   salvarTreino,
   descartarTreino(){ if (confirm("Descartar esse treino? As séries marcadas serão perdidas.")){ S.exec = null; salvar(); pararDescanso(); fecharFolha(); $("exec").hidden = true; render(); } },
+  segF(el){ sub[el.dataset.k] = el.dataset.v; desenharFolha(); },
+  cadastro(){ folhaCadastro(); },
+  cadOp(el){ CAD[el.dataset.c] = el.dataset.v || null; desenharFolha(); },
+  cadParq(el){ CAD.parq[+el.dataset.i] = +el.dataset.v; desenharFolha(); },
+  enviarCadastro,
+  verTermo: folhaTermo,
+  verFicha(el){ folhaFicha(el.dataset.id); },
+  baixarDados,
+  pedirExclusao(){
+    if (!confirm("Pedir pra apagar todos os seus dados? Isso encerra a consultoria quando o Jorge confirmar.")) return;
+    S.exclusao.push({aluno:EU, data:iso(hoje0()), feito:false}); salvar(); render(); toast("Pedido enviado pro Jorge");
+  },
   /* Jorge */
+  verPendente(el){ sub.modeloAprov = null; folhaPendente(el.dataset.id); },
+  modeloAprov(el){ sub.modeloAprov = el.dataset.v; desenharFolha(); },
+  aprovar(el){ aprovar(el.dataset.id); },
+  recusar(el){ if (!confirm("Recusar esse cadastro? Ele é apagado.")) return; S.pendentes = S.pendentes.filter(x => x.id !== el.dataset.id); salvar(); fecharFolha(); render(); toast("Cadastro recusado"); },
+  confirmarExclusao(el){
+    const a = aluno(el.dataset.id);
+    if (!confirm(`Apagar os dados de ${a.nome}? No protótipo só marca como feito.`)) return;
+    S.exclusao.forEach(x => { if (x.aluno === a.id) x.feito = true; }); salvar(); render(); toast("Dados apagados e pedido concluído");
+  },
+  verEvolucao(el){ sub.evo = "desemp"; folhaEvolucao(el.dataset.id); },
   verTodosAl(){ sub.verTodosAl = true; render(); },
   verAluno(el){ folhaAluno(el.dataset.id); },
-  responderCk(el){ folhaResponder(el.dataset.id); },
-  rapida(el){ const t = $("resp-txt"); t.value = folhaResponder.rapidas[+el.dataset.i]; t.focus(); },
-  enviarResp(el){
-    const t = $("resp-txt").value.trim(); if (!t){ toast("Escreve a resposta ou toca numa pronta"); return; }
-    const c = S.checkins.find(z => z.id === el.dataset.id); c.resposta = t; c.respData = iso(hoje0()); salvar(); fecharFolha(); render();
-    toast(`Resposta enviada pro ${primeiro(aluno(c.aluno).nome)} ✅`);
-  },
   filtro(el){ filtro.tipo = el.dataset.v; render(); },
-  novoAluno(){ abrirFolha("Convidar aluno", () => `<div class="campo"><label for="na-n">Nome</label><input id="na-n" class="inp" placeholder="Nome do aluno"></div>
-      <div class="campo"><label for="na-e">E-mail ou WhatsApp</label><input id="na-e" class="inp" placeholder="Pra onde vai o convite"></div>
-      <div class="campo"><span class="lbl">Plano</span><div class="chips"><span class="chip info">Online</span><span class="chip">Presencial</span><span class="chip">Híbrido</span></div></div>
-      <div class="demo"><span>🔐</span><span>O aluno recebe um link, cria a senha e instala o app. Só entra quem o ${esc(MARCA.curto)} convidar. No primeiro acesso ele preenche a anamnese e aceita o termo de uso dos dados (LGPD).</span></div>
-      <a class="btn wa full" href="${wa(`Oi! Bem-vindo(a) à consultoria ${MARCA.nome} 💪 Teu acesso ao app: (link do convite). Abre, cria tua senha e adiciona na tela inicial.`)}" target="_blank" rel="noopener">Mandar convite no WhatsApp</a>`, true); },
+  novoAluno(){ const link = location.origin + location.pathname + "?cadastro=1";
+    abrirFolha("Aluno novo", () => `<p class="small muted">Manda o link de cadastro. A pessoa preenche dados, anamnese, PAR-Q e aceita o termo. O cadastro chega no topo do seu painel pra você aprovar.</p>
+      <div class="campo"><span class="lbl">Link de cadastro</span><div class="row"><input class="inp grow" readonly value="${esc(link)}"><button type="button" class="btn" data-a="copiar" data-t="${esc(link)}" data-msg="Link copiado">Copiar</button></div></div>
+      <a class="btn wa full" href="${wa(`Oi! Pra entrar na consultoria ${MARCA.nome} 💪 faz teu cadastro por aqui: ${link} . Assim que eu aprovar, teu treino aparece no app.`)}" target="_blank" rel="noopener">Mandar link no WhatsApp</a>`, true); },
   editarTreino(el){ editarTreino(el.dataset.id); },
   edAba(el){ ED.aba = +el.dataset.i; desenharFolha(true); },
   edNovo(){ const letras = "ABCDEFGH", l = letras.split("").find(x => !ED.treinos.some(t => t.letra === x)) || "X";
@@ -1357,7 +1430,7 @@ $("troca").addEventListener("click", () => { S.papel = null; salvar(); $("exec")
 document.addEventListener("input", e => {
   const el = e.target, t = el.dataset && el.dataset.in; if (!t) return;
   if (t === "set"){ const z = S.exec.sets[el.dataset.i][el.dataset.k]; z[el.dataset.c] = numIn(el.value); salvar(); }
-  else if (t === "ck"){ const c = el.dataset.c; CK[c] = c === "peso" || c === "cintura" ? numIn(el.value) : el.value; }
+  else if (t === "cad"){ CAD[el.dataset.c] = el.value; }
   else if (t === "fim"){ FIM[el.dataset.c] = el.value; }
   else if (t === "busca"){ filtro.busca = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="busca"]'); n.focus(); n.setSelectionRange(p,p); }
   else if (t === "buscaEx"){ sub.buscaEx = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="buscaEx"]'); n.focus(); n.setSelectionRange(p,p); }
@@ -1406,11 +1479,14 @@ document.addEventListener("focusin", e => { if (e.target.matches && e.target.mat
 
 /* ================= início ================= */
 S = carregar() || semear();
+S.novos.forEach(a => { if (!ALUNOS.some(x => x.id === a.id)) ALUNOS.push(a); });
 /* link direto: ?ver=jorge ou ?ver=aluno (pra mandar o link já na visão certa) */
 const qs = new URLSearchParams(location.search);
 if (qs.get("ver") === "jorge" || qs.get("ver") === "aluno"){ S.papel = qs.get("ver"); if (qs.get("aba")) S.aba[S.papel] = qs.get("aba"); history.replaceState(null, "", location.pathname); }
+if (qs.get("cadastro")){ S.papel = null; history.replaceState(null, "", location.pathname); }
 salvar();
 render();
+if (qs.get("cadastro")) folhaCadastro();
 if (S.exec && S.papel === "aluno") abrirExec();
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 })();

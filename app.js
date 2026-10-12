@@ -110,14 +110,13 @@ const treinosDe = id => S.treinos[id] || modeloDe(id).treinos;
 const programaDe = id => S.programa[id] || modeloDe(id).nome;
 const acharTreino = (id, letra) => treinosDe(id).find(t => t.letra === letra) || PLANO_B.find(t => t.letra === letra);
 const sessoesDe = id => S.sessoes.filter(s => s.aluno === id).sort((a,b) => a.ts - b.ts);
-const checkinsDe = id => S.checkins.filter(c => c.aluno === id).sort((a,b) => a.ts - b.ts);
 const durEst = t => Math.max(15, Math.round((t.exs.reduce((m,e) => m + e.series*(/min/.test(e.reps) ? repsNum(e.reps)*60 : 50) + e.series*(e.jun ? 0 : e.desc||0), 0)/60 + (t.local === "academia" ? 8 : 0))/5)*5);
 const gruposDe = t => [...new Set(t.exs.map(e => ex(e.id).grupo).filter(g => g && g !== "Core" && g !== "Cardio"))];
 
 function semear(){
   const h = hoje0(), r = rng(20261009);
-  const s = {v:4, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], checkins:[], treinos:{}, programa:{},
-    venc:{}, pagos:{}, fotos:[], exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2)),
+  const s = {v:4, semente: iso(h), papel:null, aba:{aluno:"hoje", jorge:"painel"}, sessoes:[], avals:{}, treinos:{}, programa:{},
+    venc:{}, pagos:{}, exExtra:{}, midia:{}, modelosExtra:[], troca:{}, anteriores:{}, exec:null, recado:D.RECADO, recadoData: iso(addDias(h,-2)),
     /* cadastro: o aluno se inscreve e o Jorge aprova */
     pendentes: D.PENDENTES.map(p => Object.assign({}, p, {data: iso(addDias(h, -p.diasAtras)), termo: iso(addDias(h, -p.diasAtras))})),
     novos:[], suspensos:{}, exclusao:[], meuCadastro:null,
@@ -157,20 +156,6 @@ function semear(){
   const melhor = {};
   s.sessoes.forEach(ses => { ses.series.forEach(x => { if (x.kg != null && x.kg > (melhor[x.ex] || 0)){ if (melhor[x.ex]) ses.prs.includes(x.ex) || ses.prs.push(x.ex); melhor[x.ex] = x.kg; } }); });
 
-  /* check-ins semanais da Marina (o da semana está pendente) */
-  const resp = ["Boa semana! Peso descendo no ritmo certo. Mantém tudo.","Vi que o sono caiu: tenta deitar 30 min mais cedo essa semana.",
-    "Excelente constância. Semana que vem a gente sobe a carga do agachamento.","Ótimo! A cintura caiu 1 cm e a carga subiu: é recomposição corporal.",
-    "Semana mais puxada no trabalho, normal. O importante foi não zerar.","Mandou bem! Mantém a proteína em todas as refeições.",
-    "Muito bom. Se o ombro incomodar de novo, faz a elevação na polia.","Semana top! Bora manter."];
-  for (let i = 12; i >= 1; i--){
-    const d = addDias(h, -7*i), j = 12 - i;
-    s.checkins.push({id:uid(), aluno:"marina", data:iso(d), ts:d.getTime() + 9*36e5,
-      peso: Math.round((66.8 - j*0.17 + (r()-.5)*.3)*10)/10, cintura: Math.round((74.5 - j*0.3)*2)/2,
-      sono: 3 + Math.floor(r()*2.2), energia: 3 + Math.floor(r()*2.3), estresse: 2 + Math.floor(r()*2), dieta: 3 + Math.floor(r()*2.2),
-      dor: i === 4 ? "Ombro direito, leve" : null, coment: i === 4 ? "Ombro deu sinal de novo, mas melhorou com a polia." : j % 3 === 0 ? "Semana tranquila." : "",
-      resposta: resp[j % resp.length], respData: iso(addDias(d,1))});
-  }
-
   /* outros alunos: últimos 28 dias com a frequência de cada um */
   const comentarios = {camila:"Treino pesado, amei! 🔥", pedro:"Bati 100 kg no agachamento!", beatriz:"Cansada, mas fiz tudo."};
   ALUNOS.filter(a => a.id !== "marina").forEach(a => {
@@ -186,19 +171,13 @@ function semear(){
       }
       s.sessoes.push(ses);
     }
-    const dc = addDias(h, -a.ck);
-    s.checkins.push({id:uid(), aluno:a.id, data:iso(dc), ts:dc.getTime() + (7 + Math.floor(r()*12))*36e5,
-      peso:a.peso, cintura:null, sono:2 + Math.floor(r()*3), energia:2 + Math.floor(r()*3), estresse:2 + Math.floor(r()*3), dieta:2 + Math.floor(r()*3),
-      dor:a.ck <= 2 && a.dor ? a.dor : null,
-      coment: a.id === "aline" ? "Primeira semana sem dor nas costas desde o parto! 🙌" : a.id === "rafael" ? "Campeonato daqui a 3 semanas, dá pra ajustar o treino?" : a.id === "camila" ? "Glúteo respondendo muito, já vejo diferença na calça." : a.id === "diego" ? "Lombar travou no terra quinta. Tô evitando." : "",
-      resposta: a.ck <= 2 ? null : "Valeu pelo check-in! Seguimos no plano.", respData: a.ck <= 2 ? null : iso(addDias(dc,1))});
   });
+  semearAvals(s, h, r);
   return s;
 }
 
 /* ================= consultas ================= */
 function ultimoTreinoDias(id){ const ss = sessoesDe(id); return ss.length ? diasDesde(ss[ss.length-1].data) : 99; }
-function ultimoCheckin(id){ const cs = checkinsDe(id); return cs[cs.length-1] || null; }
 function diasAteVenc(id){ return -diasDesde(S.venc[id]); }
 function inicioSemana(){ const h = hoje0(); return addDias(h, -dow(h)); }
 function sessoesSemana(id, semanasAtras = 0){
@@ -255,6 +234,9 @@ function alertas(){
     if (S.suspensos[a.id]) return;
     if (ult >= 5 && !novo) out.push({a, nivel: ult >= 9 ? 3 : 2, ic:"💤", cls: ult >= 9 ? "bad" : "warn", t:`${ult} dias sem treinar`,
       msg:`Oi ${p}, tudo bem? Senti sua falta nos treinos esses dias. Aconteceu alguma coisa? Se a rotina apertou, te mando um treino mais curto pra encaixar. 💪`});
+    const dr = diasAteReav(a.id);
+    if (dr <= 7) out.push({a, nivel:1, ic:"📏", cls:"warn", t: dr === -999 ? "Sem avaliação física" : dr < 0 ? `Reavaliação atrasada ${plural(-dr,"dia")}` : `Reavaliação em ${plural(dr,"dia")}`,
+      msg:`Oi ${p}! Tá chegando a hora da nossa reavaliação trimestral 📏 Qual dia e horário ficam bons pra você?`});
     if (v < 0) out.push({a, nivel:3, ic:"💸", cls:"bad", t:`Mensalidade atrasada há ${plural(-v,"dia")}`, msg:msgCobranca(a, v)});
     else if (v <= 3) out.push({a, nivel:1, ic:"📅", cls:"warn", t: v === 0 ? "Mensalidade vence hoje" : `Mensalidade vence em ${plural(v,"dia")}`, msg:msgCobranca(a, v)});
   });
@@ -538,10 +520,6 @@ function evoDesempenho(ss){
   }).filter(Boolean).sort((a,b) => b.p - a.p);
   const forca = evol.length ? Math.round(evol.reduce((m,e) => m + e.p, 0)/evol.length) : 0;
   const semAtual = sem[11], meta = aluno(EVO).meta;
-  const cs = checkinsDe(EVO);
-  const pts = cs.filter(c => c.peso).map(c => ({x:ddmm(deIso(c.data)), y:c.peso}));
-  const cin = cs.filter(c => c.cintura).map(c => ({x:ddmm(deIso(c.data)), y:c.cintura}));
-  const dp = pts.length > 1 ? pts[pts.length-1].y - pts[0].y : 0;
   return `
     <div class="card hero" style="gap:8px"><span class="eyebrow">Últimas 4 semanas</span>
       <h2 style="max-width:none">${ton(ult4)} levantadas</h2>
@@ -558,10 +536,7 @@ function evoDesempenho(ss){
     <div class="lista">${evol.slice(0,4).map((e,i) => `<div class="it"><span class="ic acc" style="font-weight:900">${i+1}º</span>
       <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(ex(e.id).nome)}</span><span class="s">${fmt(e.de)} → <b style="color:var(--ink)">${fmt(e.para)} kg</b></span></span>
       ${mini(historicoEx(ss, e.id).map(h => h.kg), 70, 28)}<span class="chip ok">${sinal(e.p)}%</span></div>`).join("")}</div>
-    <details class="card dt"><summary class="row"><span class="ic">⚖️</span><span class="grow"><b>Balança e medidas</b><br><span class="small muted">${fmt(pts.length ? pts[pts.length-1].y : null)} kg · ${fmt(cin.length ? cin[cin.length-1].y : null)} cm de cintura · dos check-ins</span></span><span class="seta muted">›</span></summary>
-      <span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts.length ? pts[pts.length-1].y : null)} kg</b>${pts.length > 1 ? `<span class="delta ${dp <= 0 ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde ${pts[0].x}</span>` : ""}</div>${grafico(pts, {h:120})}
-      <span class="eyebrow">Cintura</span>${grafico(cin, {h:110})}
-      <p class="small muted">A balança sozinha engana: peso parado com carga subindo e cintura caindo é ganho de músculo e perda de gordura.</p></details>`;
+    <button type="button" class="card row" data-a="verAvals" data-id="${EVO}" style="text-align:left"><span class="ic">📏</span><span class="grow"><b>Peso, medidas e % de gordura</b><br><span class="small muted">Na avaliação física trimestral</span></span><span class="seta muted">›</span></button>`;
 }
 
 function evoCargas(ss){
@@ -641,18 +616,6 @@ function evoFreq(ss){
           : `<div class="dl vazio-d"><span class="muted">${n} ${ddmm(dd)}</span><span></span><span class="muted">${dd > hoje0() ? "" : iso(dd) === iso(hoje0()) ? "hoje" : "descanso"}</span><span></span></div>`; }).join("")}</div></details>`).join("")}</div>`;
 }
 
-function evoFotos(){
-  const silh = `<svg viewBox="0 0 40 80"><circle cx="20" cy="9" r="7"/><path d="M9 20h22l-2 26h-4l-1 30h-8l-1-30h-4z"/></svg>`;
-  return `<p class="small muted">Fotos ficam só entre você e o ${esc(MARCA.curto)}, nunca públicas. Mesma luz, mesmo lugar, mesma roupa: a comparação fica justa.</p>
-    <div class="fotos">
-      <div class="foto">${silh}<span>Fev · início</span></div>
-      <div class="foto">${silh}<span>Jun</span></div>
-      ${S.fotos.map(f => `<div class="foto" style="background-image:url(${f.src})"><span>${esc(f.rot)}</span></div>`).join("")}
-      <label class="foto add"><b>+</b>Nova foto<input type="file" accept="image/*" data-in="foto" hidden></label>
-    </div>
-    <div class="demo"><span>🔒</span><span>Na versão final as fotos vão pra uma pasta privada do banco, com link que expira. Aqui no protótipo elas ficam só no seu celular.</span></div>`;
-}
-
 /* ================= ALUNO · Perfil ================= */
 function vPerfil(){
   const a = aluno(EU), v = diasAteVenc(EU), exc = S.exclusao.find(x => x.aluno === EU && !x.feito);
@@ -700,7 +663,7 @@ function htmlFicha(c){
 }
 function folhaFicha(id){
   const a = aluno(id);
-  abrirFolha(`Ficha · ${primeiro(a.nome)}`, () => htmlFicha(a.cad), true);
+  abrirFolha(`Ficha · ${primeiro(a.nome)}`, () => htmlFicha(a.cad), S.papel === "aluno");
 }
 
 /* ================= cadastro do aluno ================= */
@@ -1067,10 +1030,7 @@ function vAlunos(){
 function folhaAluno(id){
   const a = aluno(id);
   abrirFolha(a.nome, () => {
-    const v = diasAteVenc(id), [c, t] = statusAluno(a), cs = checkinsDe(id);
-    let pts = cs.filter(z => z.peso).map(z => ({x:ddmm(deIso(z.data)), y:z.peso}));
-    if (pts.length < 3 && a.peso0 != null){ const n = 8; pts = Array.from({length:n}, (_,i) => ({x: i === 0 ? `há ${a.desde}m` : i === n-1 ? "agora" : "", y: Math.round((a.peso0 + (a.peso - a.peso0)*(i/(n-1)) + (i && i < n-1 ? Math.sin(i*1.7)*.35 : 0))*10)/10})); }
-    const dp = pts.length ? pts[pts.length-1].y - pts[0].y : 0;
+    const v = diasAteVenc(id), [c, t] = statusAluno(a);
     const semanas = [3,2,1,0].map(w => ({w, n: sessoesSemana(id, w).length}));
     const al = alertas().filter(x => x.a.id === id);
     return `<div class="row">${avatar(a,"lg")}<div class="grow stack" style="gap:3px"><span class="small muted">${a.idade} anos · aluno há ${plural(a.desde,"mês","meses")}</span>
@@ -1083,13 +1043,141 @@ function folhaAluno(id){
       <div class="card flat"><span class="eyebrow">Frequência · últimas 4 semanas</span>
         ${semanas.map(s => `<div class="row"><span class="small" style="width:92px">${s.w === 0 ? "Esta semana" : s.w === 1 ? "Semana passada" : `Há ${s.w} semanas`}</span><span class="bar grow"><i style="width:${Math.min(100, s.n/a.meta*100)}%;--c:${s.n >= a.meta ? "var(--ok)" : s.w === 0 ? "var(--accent)" : "var(--warn)"}"></i></span><span class="small mono" style="width:30px;text-align:right">${s.n}/${a.meta}</span></div>`).join("")}</div>
       <div class="btns"><button type="button" class="btn" data-a="verEvolucao" data-id="${id}">📈 Evolução</button><button type="button" class="btn" data-a="verFicha" data-id="${id}">🩺 Ficha</button></div>
-      ${pts.length ? `<div class="card flat"><span class="eyebrow">Peso</span><div class="big"><b>${fmt(pts[pts.length-1].y)} kg</b><span class="delta ${(/emagre|defini/i.test(a.objetivo) ? dp <= 0 : dp >= 0) ? "ok" : "bad"}">${dp > 0 ? "+" : ""}${fmt(dp)} kg desde o início</span></div>${grafico(pts, {h:120})}</div>` : ""}
+      ${cardAval(id)}
       <div class="sec"><h2>Últimos treinos</h2></div>
       <div class="lista">${sessoesDe(id).slice(-5).reverse().map(x => `<button type="button" class="it" data-a="verSessao" data-id="${x.id}"><span class="letra-b" style="width:34px;height:34px;font-size:.85rem">${esc(x.letra)}</span>
         <span class="grow stack" style="gap:1px"><span class="t ellip">${esc(x.nome)}</span><span class="s ellip">${x.coment ? "“" + esc(x.coment) + "”" : `esforço ${x.rpe}/10 · ${x.dur} min`}</span></span><span class="r"><span class="tiny muted">${quando(x.data)}</span>${x.dor ? `<span class="chip bad">dor</span>` : ""}</span></button>`).join("")}</div>
       <div class="card row flat"><span class="ic ${v < 0 ? "bad" : v <= 7 ? "warn" : "ok"}">💳</span><span class="grow"><b>${reais(a.valor)}/mês</b><br><span class="small muted">${v < 0 ? `Atrasado há ${plural(-v,"dia")}` : `Vence ${ddmm(deIso(S.venc[id]))}`}</span></span>
         ${v <= 7 ? `<a class="btn sm" href="${wa(msgCobranca(a, v))}" target="_blank" rel="noopener">Cobrar</a>` : ""}</div>`;
   }, true);
+}
+
+/* ================= JORGE · Avaliação física (só ele vê) ================= */
+const CIRC = [["peito","Peito"],["braco","Braço"],["cintura","Cintura"],["abdomen","Abdômen"],["quadril","Quadril"],["coxa","Coxa"],["panturrilha","Panturrilha"]];
+const DOBRAS = [["peitoral","Peitoral"],["axilar","Axilar média"],["triceps","Tríceps"],["subescapular","Subescapular"],["abdominal","Abdominal"],["suprailiaca","Suprailíaca"],["coxa","Coxa"]];
+const BIO = [["gordura","Gordura (%)"],["musculo","Massa muscular (kg)"],["agua","Água (%)"],["visceral","Gordura visceral"]];
+const FORCA = [["supino","Supino 1RM est. (kg)"],["agacha","Agachamento 1RM est. (kg)"],["flexoes","Flexões (máx.)"],["prancha","Prancha (s)"]];
+const FOTOS = [["frente","Frente"],["lado","Lado"],["costas","Costas"]];
+const REAV = 90;  // reavaliação trimestral
+
+/* % de gordura pelas 7 dobras (Jackson & Pollock) + fórmula de Siri */
+function pctGordura(av, a){
+  const d = av.dobras || {}, vals = DOBRAS.map(([k]) => d[k]);
+  if (vals.some(v => v == null || isNaN(v))) return av.bio && av.bio.gordura != null ? av.bio.gordura : null;
+  const S7 = vals.reduce((m,v) => m + v, 0), id = a.idade;
+  const dens = a.sx === "F" ? 1.097 - 0.00046971*S7 + 0.00000056*S7*S7 - 0.00012828*id
+                            : 1.112 - 0.00043499*S7 + 0.00000055*S7*S7 - 0.00028826*id;
+  return Math.round((495/dens - 450)*10)/10;
+}
+const avalsDe = id => (S.avals[id] || []).slice().sort((x,y) => x.data < y.data ? -1 : 1);
+const ultAval = id => { const l = avalsDe(id); return l[l.length-1] || null; };
+const diasAteReav = id => { const u = ultAval(id); return u ? REAV - diasDesde(u.data) : -999; };
+const massaMagra = (av, a) => { const g = pctGordura(av, a); return g == null || !av.peso ? null : Math.round(av.peso*(1 - g/100)*10)/10; };
+
+/* avaliações fictícias: a Marina tem 3 (trimestrais), os outros 1 ou 2 */
+function semearAvals(s, h, r){
+  const gerar = (a, data, k) => {
+    const f = a.sx === "F", peso = Math.round((a.peso0 + (a.peso - a.peso0)*k)*10)/10, redu = 1 - .18*k*(/emagre|defini/i.test(a.objetivo) ? 1.4 : .6);
+    const base = f ? {peitoral:12, axilar:14, triceps:20, subescapular:16, abdominal:24, suprailiaca:20, coxa:28} : {peitoral:12, axilar:15, triceps:12, subescapular:17, abdominal:24, suprailiaca:20, coxa:16};
+    const fat = (peso / (f ? 64 : 80));
+    const dobras = {}; DOBRAS.forEach(([d]) => dobras[d] = Math.round(base[d]*fat*redu*(0.95 + r()*.1)*10)/10);
+    const circ = f ? {peito:90, braco:28, cintura:74, abdomen:82, quadril:100, coxa:58, panturrilha:36} : {peito:100, braco:34, cintura:86, abdomen:90, quadril:100, coxa:58, panturrilha:38};
+    const c = {}; CIRC.forEach(([x]) => c[x] = Math.round(circ[x]*Math.sqrt(fat)*(x === "cintura" || x === "abdomen" ? redu*1.04 : x === "braco" || x === "coxa" ? 1 + .04*k : 1)*2)/2);
+    const av = {id:uid(), data:iso(data), peso, altura: f ? 165 : 177, circ:c, dobras, fotos:{}, obs:""};
+    const g = pctGordura(av, a);
+    av.bio = {gordura: Math.round((g + 1.2)*10)/10, musculo: Math.round(peso*(1 - (g + 1.2)/100)*.52*10)/10, agua: Math.round((f ? 50 : 55) + k*2), visceral: Math.max(2, Math.round((f ? 5 : 8) - k*2))};
+    av.forca = {supino: Math.round((f ? 28 : 60)*(1 + .15*k)), agacha: Math.round((f ? 50 : 85)*(1 + .2*k)), flexoes: Math.round((f ? 8 : 22)*(1 + .3*k)), prancha: Math.round(45 + 40*k)};
+    return av;
+  };
+  ALUNOS.forEach((a, i) => {
+    if (a.peso0 == null) return;
+    if (a.id === "marina"){ s.avals.marina = [gerar(a, addDias(h,-175), 0), gerar(a, addDias(h,-86), .55), gerar(a, addDias(h,-2), 1)]; return; }
+    const dias = 20 + (i*23) % 95;  /* alguns já passaram dos 90 dias */
+    s.avals[a.id] = a.desde >= 6 ? [gerar(a, addDias(h, -dias - 90), .4), gerar(a, addDias(h, -dias), 1)] : [gerar(a, addDias(h, -dias), 1)];
+  });
+}
+
+function cardAval(id){
+  const a = aluno(id), u = ultAval(id), dr = diasAteReav(id);
+  if (!u) return `<div class="card row flat"><span class="ic warn">📏</span><span class="grow"><b>Sem avaliação física</b><br><span class="small muted">Faz a primeira pra ter o ponto de partida.</span></span>
+    <button type="button" class="btn sm pri" data-a="novaAval" data-id="${id}">Avaliar</button></div>`;
+  const l = avalsDe(id), p = l.length > 1 ? l[l.length-2] : null, g = pctGordura(u, a), gp = p ? pctGordura(p, a) : null;
+  return `<div class="card flat"><div class="row sb"><span class="eyebrow">Avaliação física · ${ddmm(deIso(u.data))}</span>
+      <span class="chip ${dr < 0 ? "bad" : dr <= 7 ? "warn" : ""}">${dr < 0 ? `reavaliar (${-dr}d atrasada)` : `próxima em ${dr}d`}</span></div>
+    <div class="res3"><div><b>${fmt(u.peso)}</b><span>kg${p ? ` (${sinal(Math.round((u.peso - p.peso)*10)/10)})` : ""}</span></div>
+      <div><b>${fmt(g)}%</b><span>gordura${gp != null ? ` (${sinal(Math.round((g - gp)*10)/10)})` : ""}</span></div>
+      <div><b>${fmt(massaMagra(u, a))}</b><span>kg massa magra</span></div></div>
+    <div class="btns"><button type="button" class="btn sm" data-a="verAvals" data-id="${id}">Ver e comparar${l.length > 1 ? ` (${l.length})` : ""}</button><button type="button" class="btn sm pri" data-a="novaAval" data-id="${id}">Nova avaliação</button></div></div>`;
+}
+
+function folhaAvals(id){
+  const a = aluno(id);
+  abrirFolha(`Avaliações · ${primeiro(a.nome)}`, () => {
+    const l = avalsDe(id); if (!l.length) return `<div class="vazio">Nenhuma avaliação ainda.</div>`;
+    const u = l[l.length-1], p0 = l[0], cols = l.length > 2 ? [p0, l[l.length-2], u] : l;
+    const linha = (rot, f, casas = 1, menorMelhor = true) => {
+      const vs = cols.map(av => f(av)), d = vs[0] != null && vs[vs.length-1] != null ? Math.round((vs[vs.length-1] - vs[0])*10)/10 : null;
+      const bom = d == null || d === 0 ? "" : (d < 0) === menorMelhor ? "ok" : "bad";
+      return `<tr><th>${rot}</th>${vs.map(v => `<td>${fmt(v, casas)}</td>`).join("")}<td class="${bom}">${d == null || cols.length < 2 ? "" : sinal(d)}</td></tr>`;
+    };
+    const pts = l.map(av => ({x:ddmm(deIso(av.data)), y:pctGordura(av, a)})).filter(x => x.y != null);
+    return `<p class="small muted">Só você vê. Comparando ${cols.length > 1 ? `a primeira (${ddmm(deIso(p0.data))}) com a última (${ddmm(deIso(u.data))})` : "a avaliação de " + ddmm(deIso(u.data))}.</p>
+      ${pts.length > 1 ? `<div class="card flat"><span class="eyebrow">% de gordura</span>${grafico(pts, {h:110, unid:"%"})}</div>` : ""}
+      <div class="tab-wrap"><table class="tab-av"><thead><tr><th></th>${cols.map(av => `<th>${ddmm(deIso(av.data))}</th>`).join("")}<th>Δ</th></tr></thead><tbody>
+        <tr class="grp"><th colspan="${cols.length + 2}">Composição</th></tr>
+        ${linha("Peso (kg)", av => av.peso)}
+        ${linha("% gordura (7 dobras)", av => pctGordura(av, a))}
+        ${linha("Massa magra (kg)", av => massaMagra(av, a), 1, false)}
+        <tr class="grp"><th colspan="${cols.length + 2}">Circunferências (cm)</th></tr>
+        ${CIRC.map(([k, n]) => linha(n, av => av.circ && av.circ[k], 1, !["braco","coxa","peito","panturrilha"].includes(k))).join("")}
+        <tr class="grp"><th colspan="${cols.length + 2}">Dobras (mm)</th></tr>
+        ${DOBRAS.map(([k, n]) => linha(n, av => av.dobras && av.dobras[k])).join("")}
+        <tr class="grp"><th colspan="${cols.length + 2}">Bioimpedância</th></tr>
+        ${BIO.map(([k, n]) => linha(n, av => av.bio && av.bio[k], 1, k !== "musculo" && k !== "agua")).join("")}
+        <tr class="grp"><th colspan="${cols.length + 2}">Força</th></tr>
+        ${FORCA.map(([k, n]) => linha(n, av => av.forca && av.forca[k], 0, false)).join("")}
+      </tbody></table></div>
+      <div class="sec"><h2>Fotos</h2></div>
+      <div class="fotos-av">${FOTOS.map(([k, n]) => `<div class="par"><span class="eyebrow">${n}</span><div class="row" style="gap:6px">${[p0, u].filter((x,i,arr) => arr.indexOf(x) === i).map(av => fotoAv(av, k)).join("")}</div></div>`).join("")}</div>
+      <p class="tiny muted">Fotos ficam numa pasta privada, com link que expira. Nunca aparecem pro aluno nem pra mais ninguém.</p>`;
+  });
+}
+const SILH = `<svg viewBox="0 0 40 80" aria-hidden="true"><circle cx="20" cy="9" r="7"/><path d="M9 20h22l-2 26h-4l-1 30h-8l-1-30h-4z"/></svg>`;
+const fotoAv = (av, k) => `<div class="foto"${av.fotos && av.fotos[k] ? ` style="background-image:url(${av.fotos[k]})"` : ""}>${av.fotos && av.fotos[k] ? "" : SILH}<span>${ddmm(deIso(av.data))}</span></div>`;
+
+/* nova avaliação: já vem com os números da última, o Jorge só troca o que mudou */
+let AV = null;
+function folhaNovaAval(id){
+  const a = aluno(id), u = ultAval(id);
+  AV = {aluno:id, data:iso(hoje0()), peso: u ? u.peso : null, altura: u ? u.altura : null, circ: Object.assign({}, u && u.circ), dobras: Object.assign({}, u && u.dobras),
+    bio: Object.assign({}, u && u.bio), forca: Object.assign({}, u && u.forca), fotos:{}, obs:""};
+  abrirFolha(`Avaliar · ${primeiro(a.nome)}`, () => {
+    const campo = (grupo, k, n) => `<label>${n}<input inputmode="decimal" data-in="av" data-g="${grupo}" data-c="${k}" value="${AV[grupo][k] != null ? fmt(AV[grupo][k]) : ""}"></label>`;
+    const g = pctGordura(AV, a);
+    return `<p class="small muted">${u ? `Já veio preenchido com a avaliação de ${ddmm(deIso(u.data))}. Troca só o que mudou.` : "Primeira avaliação: vira o ponto de partida."}</p>
+      <div class="card"><span class="eyebrow">Peso e altura</span><div class="ed-campos" style="grid-template-columns:repeat(2,1fr)">
+        <label>Peso (kg)<input inputmode="decimal" data-in="av" data-c="peso" value="${AV.peso != null ? fmt(AV.peso) : ""}"></label>
+        <label>Altura (cm)<input inputmode="decimal" data-in="av" data-c="altura" value="${AV.altura != null ? fmt(AV.altura) : ""}"></label></div></div>
+      <div class="card"><span class="eyebrow">Circunferências (cm)</span><div class="ed-campos">${CIRC.map(([k,n]) => campo("circ", k, n)).join("")}</div></div>
+      <div class="card"><div class="row sb"><span class="eyebrow">Dobras cutâneas (mm) · 7 dobras</span><span class="chip acc" id="av-g">${g != null ? fmt(g) + "% gordura" : "—"}</span></div>
+        <div class="ed-campos">${DOBRAS.map(([k,n]) => campo("dobras", k, n)).join("")}</div>
+        <span class="tiny muted">% de gordura por Jackson & Pollock (7 dobras) + Siri, com idade e sexo do aluno.</span></div>
+      <div class="card"><span class="eyebrow">Bioimpedância</span><div class="ed-campos">${BIO.map(([k,n]) => campo("bio", k, n)).join("")}</div></div>
+      <div class="card"><span class="eyebrow">Testes de força</span><div class="ed-campos" style="grid-template-columns:repeat(2,1fr)">${FORCA.map(([k,n]) => campo("forca", k, n)).join("")}</div></div>
+      <div class="card"><span class="eyebrow">Fotos</span><div class="fotos">${FOTOS.map(([k,n]) => `<label class="foto add"${AV.fotos[k] ? ` style="background-image:url(${AV.fotos[k]})"` : ""}>${AV.fotos[k] ? "" : `<b>+</b>`}${n}<input type="file" accept="image/*" capture="environment" data-in="avFoto" data-c="${k}" hidden></label>`).join("")}</div>
+        <span class="tiny muted">Mesma luz, mesmo lugar, mesma roupa: a comparação fica justa.</span></div>
+      <div class="campo"><label for="av-obs">Observações</label><textarea id="av-obs" class="inp" data-in="av" data-c="obs" placeholder="Postura, queixas, metas pro próximo trimestre…">${esc(AV.obs)}</textarea></div>
+      <button type="button" class="btn pri full" data-a="salvarAval">Salvar avaliação</button>`;
+  });
+}
+function salvarAval(){
+  if (!AV.peso){ toast("Coloca pelo menos o peso"); return; }
+  const id = AV.aluno, a = aluno(id);
+  (S.avals[id] = S.avals[id] || []).push({id:uid(), data:AV.data, peso:AV.peso, altura:AV.altura, circ:AV.circ, dobras:AV.dobras, bio:AV.bio, forca:AV.forca, fotos:AV.fotos, obs:AV.obs});
+  try { salvar(); } catch(e){ S.avals[id][S.avals[id].length-1].fotos = {}; salvar(); toast("Fotos grandes demais pro protótipo: salvei sem elas"); }
+  const g = pctGordura(AV, a); AV = null;
+  fecharFolha(); render(); toast(`Avaliação salva${g != null ? ` · ${fmt(g)}% de gordura` : ""} ✅`);
+  setTimeout(() => folhaAluno(id), 50);
 }
 
 /* ================= JORGE · Treinos (montar) ================= */
@@ -1357,6 +1445,9 @@ const A = {
     if (!confirm(`Apagar os dados de ${a.nome}? No protótipo só marca como feito.`)) return;
     S.exclusao.forEach(x => { if (x.aluno === a.id) x.feito = true; }); salvar(); render(); toast("Dados apagados e pedido concluído");
   },
+  novaAval(el){ folhaNovaAval(el.dataset.id); },
+  verAvals(el){ folhaAvals(el.dataset.id); },
+  salvarAval,
   verEvolucao(el){ sub.evo = "desemp"; folhaEvolucao(el.dataset.id); },
   verTodosAl(){ sub.verTodosAl = true; render(); },
   verAluno(el){ folhaAluno(el.dataset.id); },
@@ -1431,6 +1522,11 @@ document.addEventListener("input", e => {
   const el = e.target, t = el.dataset && el.dataset.in; if (!t) return;
   if (t === "set"){ const z = S.exec.sets[el.dataset.i][el.dataset.k]; z[el.dataset.c] = numIn(el.value); salvar(); }
   else if (t === "cad"){ CAD[el.dataset.c] = el.value; }
+  else if (t === "av" && AV){
+    const c = el.dataset.c, g = el.dataset.g;
+    if (g) AV[g][c] = numIn(el.value); else AV[c] = c === "obs" ? el.value : numIn(el.value);
+    const gd = pctGordura(AV, aluno(AV.aluno)), x = $("av-g"); if (x) x.textContent = gd != null ? fmt(gd) + "% gordura" : "—";
+  }
   else if (t === "fim"){ FIM[el.dataset.c] = el.value; }
   else if (t === "busca"){ filtro.busca = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="busca"]'); n.focus(); n.setSelectionRange(p,p); }
   else if (t === "buscaEx"){ sub.buscaEx = el.value; const p = el.selectionStart; render(); const n = document.querySelector('[data-in="buscaEx"]'); n.focus(); n.setSelectionRange(p,p); }
@@ -1459,15 +1555,15 @@ document.addEventListener("change", e => {
     fr.readAsDataURL(f);
     return;
   }
-  if (el.dataset && el.dataset.in === "foto" && el.files && el.files[0]){
+  /* foto da avaliação: reduz pra caber no celular */
+  if (el.dataset && el.dataset.in === "avFoto" && el.files && el.files[0] && AV){
     const fr = new FileReader();
     fr.onload = () => {
       const img = new Image();
       img.onload = () => {
         const c = document.createElement("canvas"), k = Math.min(1, 360/img.width);
         c.width = img.width*k; c.height = img.height*k; c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-        S.fotos.push({src:c.toDataURL("image/jpeg", .7), rot:ddmm(hoje0())}); if (S.fotos.length > 4) S.fotos.shift();
-        salvar(); render(); toast("Foto salva 📸");
+        AV.fotos[el.dataset.c] = c.toDataURL("image/jpeg", .7); desenharFolha(); toast("Foto pronta 📸");
       };
       img.src = fr.result;
     };

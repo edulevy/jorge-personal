@@ -12,6 +12,16 @@ const MARCA = {
   pix: "jorge.personal@pix.com.br" // chave fictícia
 };
 
+/* opções de marca pro Jorge escolher (nome, iniciais e cor). Antes de fechar: conferir nome no INPI e domínio no registro.br */
+const MARCAS = [
+  {id:"bunn", nome:"Bunn Performance", iniciais:"BP", slogan:"Treino individual, de perto, de onde você estiver", dominio:"app.bunnperformance.com.br",
+   claro:{accent:"#d9480f", ink:"#ffffff", soft:"#fde8dc"}, escuro:{accent:"#ff6a2b", ink:"#1b0b03", soft:"#3a1d10"}, cor:"Laranja"},
+  {id:"jb", nome:"JB Coach", iniciais:"JB", slogan:"Consultoria de treino com o Jorge Bunn", dominio:"app.jbcoach.com.br",
+   claro:{accent:"#1d4ed8", ink:"#ffffff", soft:"#dfe7fb"}, escuro:{accent:"#5b8cff", ink:"#050c1f", soft:"#16213d"}, cor:"Azul"},
+  {id:"metodo", nome:"Método Bunn", iniciais:"MB", slogan:"Seu treino, sua evolução, do jeito certo", dominio:"app.metodobunn.com.br",
+   claro:{accent:"#a16207", ink:"#ffffff", soft:"#fbf0d4"}, escuro:{accent:"#facc15", ink:"#1d1600", soft:"#3a3010"}, cor:"Dourado"}
+];
+
 /* local: onde dá pra fazer · alt: trocas quando o aparelho está ocupado */
 const EX = {
   supino_reto:        {nome:"Supino reto com barra", grupo:"Peito", local:"academia", dica:"Escápulas encaixadas no banco, pés firmes. Desce a barra até o meio do peito, sem quicar.", alt:["supino_halter","supino_maquina","flexao"]},
@@ -259,5 +269,5 @@ const DORES = [
   {dor:"Paga por aluno, todo mês", porque:"Plataformas cobram mensalidade que cresce com o número de alunos, e os dados ficam nelas.", aqui:"Custo fixo de infraestrutura, e os dados dos alunos são do Jorge."}
 ];
 
-return {MARCA, EX, METODOS, ORIENT, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
+return {MARCA, MARCAS, EX, METODOS, ORIENT, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
 })();

@@ -1019,6 +1019,7 @@ function vPainel(){
       <span class="s ellip">${x.dor ? `<span style="color:var(--bad);font-weight:700">🩹 ${esc(x.dor)}</span> · ` : ""}${x.coment ? "“" + esc(x.coment) + "”" : `esforço ${x.rpe}/10 · ${x.dur} min`}</span></span>
       <span class="r"><span class="tiny muted">${quando(x.data)}<br>${hora(x.ts)}</span></span></button>`; }).join("")}</div>
     <button type="button" class="card row" data-a="recado" style="text-align:left"><span class="ic acc">📣</span><span class="grow"><b>Recado da semana</b><br><span class="small muted ellip" style="display:block">${esc(S.recado)}</span></span><span class="seta muted">›</span></button>
+    <button type="button" class="card row" data-a="verMarca" style="text-align:left"><span class="logo sm">${esc(MARCA.iniciais)}</span><span class="grow"><b>Marca do app</b><br><span class="small muted">${esc(MARCA.nome)} · 3 opções de nome e cor, tema escuro ou claro</span></span><span class="seta muted">›</span></button>
     <button type="button" class="card row" data-a="dores" style="text-align:left"><span class="ic">💡</span><span class="grow"><b>Por que um app só seu?</b><br><span class="small muted">As dores dos apps que já existem</span></span><span class="seta muted">›</span></button>`;
   return {sub: dataHoje(), tit: `${oi}, ${MARCA.curto}`, html};
 }
@@ -1190,6 +1191,32 @@ function folhaNutri(id){
     <div class="campo"><label for="nt-n">Nutricionista parceiro</label><input id="nt-n" class="inp" value="${esc(n.nutri || "")}" placeholder="Nome e CRN"></div>
     <div class="campo"><span class="lbl">Plano alimentar (PDF)</span>${n.pdf ? `<span class="small">📄 ${esc(n.pdf.nome)}</span>` : ""}<label class="btn sm" style="align-self:flex-start">${n.pdf ? "Trocar PDF" : "Anexar PDF"}<input type="file" accept="application/pdf,image/*" data-in="nutriPdf" data-id="${id}" hidden></label></div>
     <button type="button" class="btn pri full" data-a="salvarNutri" data-id="${id}">Salvar</button>`);
+}
+
+/* ================= Marca e tema ================= */
+const marcaAtual = () => D.MARCAS.find(m => m.id === S.marca) || D.MARCAS[0];
+const escuroAgora = () => S.tema === "escuro" || (S.tema === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+function aplicarMarca(){
+  const m = marcaAtual(), r = document.documentElement;
+  Object.assign(MARCA, {nome:m.nome, iniciais:m.iniciais, slogan:m.slogan});
+  r.dataset.tema = S.tema;
+  const v = c => `--accent:${c.accent};--accent-ink:${c.ink};--accent-soft:${c.soft}`;
+  let st = $("marca-css"); if (!st){ st = document.createElement("style"); st.id = "marca-css"; document.head.appendChild(st); }
+  st.textContent = `:root{${v(m.claro)}}@media (prefers-color-scheme: dark){:root:not([data-tema="claro"]){${v(m.escuro)}}}:root[data-tema="escuro"]{${v(m.escuro)}}`;
+  document.title = m.nome;
+  document.querySelectorAll('meta[name="theme-color"]').forEach(x => x.content = escuroAgora() ? "#0e0f11" : "#f3f2ee");
+}
+function folhaMarca(){
+  abrirFolha("Marca do app", () => { const esc_ = escuroAgora();
+    return `<p class="small muted">Nome, iniciais e cor que o aluno vê no celular. Toca numa opção pra ver o app inteiro com ela. O logo de verdade vem de um designer depois: aqui é pra escolher a direção.</p>
+    <div class="campo"><span class="lbl">Tema</span><div class="chips">${[["escuro","🌙 Escuro"],["claro","☀️ Claro"],["auto","📱 Segue o celular"]].map(([v,n]) => `<button type="button" class="chip" data-a="tema" data-v="${v}" aria-pressed="${S.tema === v}">${n}</button>`).join("")}</div></div>
+    ${D.MARCAS.map(m => { const c = esc_ ? m.escuro : m.claro, on = S.marca === m.id;
+      return `<button type="button" class="card marca-op${on ? " on" : ""}" data-a="marca" data-id="${m.id}" style="text-align:left;--c:${c.accent}">
+        <div class="row"><span class="logo" style="background:${c.accent};color:${c.ink}">${esc(m.iniciais)}</span>
+          <span class="grow stack" style="gap:2px"><b style="font-size:1.1rem">${esc(m.nome)}</b><span class="small muted">${esc(m.slogan)}</span></span>${on ? `<span class="chip ok">em uso</span>` : ""}</div>
+        <div class="row" style="gap:8px"><span class="amostra" style="background:${c.accent};color:${c.ink}">Começar treino</span><span class="chip" style="background:${c.soft};color:${c.accent}">${esc(m.cor)}</span></div>
+        <span class="tiny muted">🌐 ${esc(m.dominio)}</span></button>`; }).join("")}
+    <div class="demo"><span>📝</span><span>Antes de fechar o nome: conferir se está livre no INPI (marca) e no registro.br (domínio, uns R$ 40 por ano).</span></div>`; }, true);
 }
 
 /* ================= JORGE · Avaliação física (só ele vê) ================= */
@@ -1620,6 +1647,9 @@ const A = {
   verNutri(el){ folhaNutri(el.dataset.id); },
   salvarNutri(el){ const id = el.dataset.id, n = Object.assign({}, nutriDe(id));
     n.orient = $("nt-o").value.trim() || D.ORIENT; n.nutri = $("nt-n").value.trim(); S.nutri[id] = n; salvar(); voltarFolha(); toast("Alimentação salva"); },
+  verMarca: folhaMarca,
+  marca(el){ S.marca = el.dataset.id; salvar(); aplicarMarca(); desenharFolha(); render(); toast(`Marca: ${MARCA.nome}`); },
+  tema(el){ S.tema = el.dataset.v; salvar(); aplicarMarca(); desenharFolha(); },
   verEvolucao(el){ sub.evo = "desemp"; folhaEvolucao(el.dataset.id); },
   verTodosAl(){ sub.verTodosAl = true; render(); },
   verAluno(el){ folhaAluno(el.dataset.id); },
@@ -1758,6 +1788,9 @@ document.addEventListener("focusin", e => { if (e.target.matches && e.target.mat
 /* ================= início ================= */
 S = carregar() || semear();
 S.novos.forEach(a => { if (!ALUNOS.some(x => x.id === a.id)) ALUNOS.push(a); });
+/* o Jorge gostou do tema escuro: vem escuro de saída (dá pra trocar em Painel → Marca do app) */
+S.marca = S.marca || "bunn"; S.tema = S.tema || "escuro";
+aplicarMarca();
 /* link direto: ?ver=jorge ou ?ver=aluno (pra mandar o link já na visão certa) */
 const qs = new URLSearchParams(location.search);
 if (qs.get("ver") === "jorge" || qs.get("ver") === "aluno"){ S.papel = qs.get("ver"); if (qs.get("aba")) S.aba[S.papel] = qs.get("aba"); history.replaceState(null, "", location.pathname); }

@@ -1,0 +1,33 @@
+# Mantém o Supabase acordado: no plano grátis ele pausa depois de 7 dias sem uso.
+# A cada 3 dias o GitHub chama a função ping() do banco (não lê nenhum dado).
+# Se falhar, o GitHub manda e-mail pro dono do repositório: esse é o lembrete.
+#
+# Pra ligar (uma vez, depois de criar o Supabase):
+#   GitHub → repositório → Settings → Secrets and variables → Actions → New repository secret
+#     SUPABASE_URL       = Project URL (ex.: https://abcd.supabase.co)
+#     SUPABASE_ANON_KEY  = anon / publishable key (a pública, a mesma do config.js)
+# Só funciona na branch principal (main), dentro de .github/workflows/ (hoje está guardado em supabase/automacao/).
+name: Manter Supabase acordado
+
+on:
+  schedule:
+    - cron: "0 12 */3 * *"   # a cada 3 dias, 9h de Brasília
+  workflow_dispatch:          # botão "Run workflow" pra testar na hora
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cutucar o banco
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          CHAVE: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$CHAVE" ]; then
+            echo "Supabase ainda não configurado (faltam os secrets). Nada a fazer."
+            exit 0
+          fi
+          resposta=$(curl -sS --fail -X POST "$URL/rest/v1/rpc/ping" \
+            -H "apikey: $CHAVE" -H "Authorization: Bearer $CHAVE" -H "Content-Type: application/json" -d '{}')
+          echo "Resposta do banco: $resposta"
+          [ "$resposta" = '"ok"' ] || { echo "O banco não respondeu ok. Confira no painel do Supabase se ele foi pausado."; exit 1; }

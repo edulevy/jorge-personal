@@ -69,7 +69,7 @@ O convite feito pelo Jorge continua valendo junto.
 ## Passo a passo pra ligar de verdade
 
 1. Criar conta em supabase.com → **New project**, região **South America (São Paulo)**. Guarde a senha do banco num gerenciador de senhas.
-2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito, `migrations/20261012000001_cadastro.sql`.
+2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito, `migrations/20261012000001_cadastro.sql` e `migrations/20261012000002_ping.sql`.
 3. **SQL Editor** → colar `testes/testes-protecao.sql` → **Run**. Tem que aparecer `TODOS OS TESTES PASSARAM`. Depois `testes/testes-cadastro.sql` → `TODOS OS TESTES DO CADASTRO PASSARAM`.
 4. **Authentication → URL Configuration**:
    - em **Site URL**, o endereço do app;
@@ -80,7 +80,8 @@ O convite feito pelo Jorge continua valendo junto.
    select id, 'treinador', 'Jorge' from auth.users where email = 'EMAIL-DO-JORGE';
    ```
 6. **Project Settings → API**: copiar a **Project URL** e a **anon / publishable key** pro `config.js`.
-7. Testar no PC: na pasta `prototipo`, rodar `python -m http.server 8000` e abrir `http://localhost:8000`.
+7. **No mesmo dia**, ligar o "cutucão" (o plano grátis pausa o projeto depois de 7 dias sem uso): GitHub → repositório → **Settings → Secrets and variables → Actions** → criar `SUPABASE_URL` (a Project URL) e `SUPABASE_ANON_KEY` (a chave pública). Antes, mover `supabase/automacao/manter-supabase-acordado.yml` pra `.github/workflows/` na `main` (o push pede a permissão `workflow`: rodar `gh auth refresh -s workflow` e aceitar no navegador). Testar em **Actions → Manter Supabase acordado → Run workflow**: tem que aparecer `Resposta do banco: "ok"`. Se um dia falhar, o GitHub manda e-mail.
+8. Testar no PC: na pasta `prototipo`, rodar `python -m http.server 8000` e abrir `http://localhost:8000`.
 
 ## Antes de entrar aluno de verdade
 

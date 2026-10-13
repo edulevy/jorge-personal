@@ -22,8 +22,13 @@ app no navegador e mande pedidos "na mão", o banco responde só o que aquela pe
 |---|---|
 | `migrations/20261010000001_esquema.sql` | Cria as 11 tabelas, liga o RLS e escreve todas as regras. Roda **uma vez**. |
 | `migrations/20261012000001_cadastro.sql` | Cadastro com aprovação ("Quero ser aluno"): tabela de pedidos, regras e as funções de aprovar e recusar. Roda **depois** do esquema. |
+| `migrations/20261012000002_ping.sql` | O "cutucão": função `ping()` que só responde "ok", pro Supabase grátis não pausar. |
+| `migrations/20261012000003_rodadas.sql` | Tudo que o protótipo ganhou nas rodadas: suspender acesso, plano série a série, avaliação física, chat, Pix com comprovante, planos, alimentação, avisos e pedido de exclusão (LGPD). |
 | `testes/testes-protecao.sql` | 27 testes: entra como Jorge, aluna, outra treinadora, intruso e visitante e tenta furar as regras. Não deixa nada gravado. |
 | `testes/testes-cadastro.sql` | 21 testes do cadastro: Ana se cadastra certo, Bruno tenta trapacear (se aprovar, mandar em nome dos outros, ler a anamnese da Ana), Carla tenta pegar pedido do Jorge. |
+| `testes/testes-rodadas.sql` | 37 testes das rodadas: Marina em dia, Pedro suspenso que paga e depois pede pra apagar os dados, Carla, Rita e intruso tentando ver o que não devem. |
+| `automacao/manter-supabase-acordado.yml` | Automação do GitHub que cutuca o banco a cada 3 dias. Vai pra `.github/workflows/` quando ligar o Supabase. |
+| `teste-local/rodar-testes.sh` | Monta o banco do zero num PostgreSQL do computador e roda todos os testes. |
 | `teste-local/imitar-supabase.sql` | Só pra testar num PostgreSQL comum no computador. **Não rodar no Supabase.** |
 | `../config.js` | Endereço e chave pública. Vazio = modo demonstração. |
 | `../banco.js` | Faz o app conversar com o banco: login, leitura, gravação e fila sem internet. |
@@ -38,12 +43,22 @@ app no navegador e mande pedidos "na mão", o banco responde só o que aquela pe
 | Treino feito | vê, registra, apaga | registra e corrige | nada | nada | nada |
 | Check-in | **só escreve a resposta** | manda (não responde) | nada | nada | nada |
 | Pagamentos | registra | só vê | nada | nada | nada |
-| Fotos | vê | põe e apaga, **só na pasta dele** | nada | nada | nada |
+| Fotos de evolução | vê e apaga | põe e apaga, **só na pasta dele** | nada | nada | nada |
+| Avaliação física (e as fotos dela) | registra | **nada** | nada | nada | nada |
+| Chat | conversa (como treinador) | conversa (como aluno), marca como lida | nada | nada | nada |
+| Comprovante de Pix | confirma ou recusa | manda (só "pendente", só na pasta dele) | nada | nada | nada |
+| Planos e preços | cria, liga, desliga | vê os ligados | — | nada | nada |
+| Alimentação (orientações + PDF) | escreve e anexa | só lê | nada | nada | nada |
+| Avisos no celular | vê | escolhe os dele | nada | nada | nada |
+| Pedido de exclusão (LGPD) | conclui | pede | nada | nada | nada |
 
 Ainda conferido pelos testes:
 - Aluno desligado (`ativo = false`) perde o acesso, e o histórico fica com o Jorge.
 - Uma treinadora não enxerga nada dos alunos da outra.
 - Ninguém se promove a treinador sozinho.
+- **Aluno suspenso** (`suspenso_em` preenchido): vê a ficha, os pagamentos e o chat e manda comprovante, mas não vê o treino nem registra treino. Quando o Jorge confirma o Pix, a suspensão sai sozinha.
+- **Confirmar Pix** (`confirmar_comprovante`): entra o pagamento e o vencimento anda conforme o plano (mensal 30 dias, trimestral 90, semestral 180). O mesmo comprovante não vale duas vezes.
+- **Exclusão (LGPD)** (`concluir_exclusao`): o app apaga os arquivos do aluno primeiro (fotos, comprovantes, PDF); o banco confere que não sobrou nenhum e apaga a ficha com tudo junto (treinos, cargas, avaliações, chat, pagamentos). O pedido fica guardado como prova. A conta de login continua existindo, mas não enxerga nada.
 
 ## Cadastro só por convite (como funciona)
 
@@ -69,8 +84,8 @@ O convite feito pelo Jorge continua valendo junto.
 ## Passo a passo pra ligar de verdade
 
 1. Criar conta em supabase.com → **New project**, região **South America (São Paulo)**. Guarde a senha do banco num gerenciador de senhas.
-2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito, `migrations/20261012000001_cadastro.sql` e `migrations/20261012000002_ping.sql`.
-3. **SQL Editor** → colar `testes/testes-protecao.sql` → **Run**. Tem que aparecer `TODOS OS TESTES PASSARAM`. Depois `testes/testes-cadastro.sql` → `TODOS OS TESTES DO CADASTRO PASSARAM`.
+2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito e **nesta ordem**: `20261012000001_cadastro.sql`, `20261012000002_ping.sql` e `20261012000003_rodadas.sql`.
+3. **SQL Editor** → colar `testes/testes-protecao.sql` → **Run**. Tem que aparecer `TODOS OS TESTES PASSARAM`. Depois `testes/testes-cadastro.sql` → `TODOS OS TESTES DO CADASTRO PASSARAM` e `testes/testes-rodadas.sql` → `TODOS OS TESTES DAS RODADAS PASSARAM`.
 4. **Authentication → URL Configuration**:
    - em **Site URL**, o endereço do app;
    - em **Redirect URLs**, `http://localhost:8000/**` (pra testar no PC) e o endereço publicado.
@@ -83,18 +98,32 @@ O convite feito pelo Jorge continua valendo junto.
 7. **No mesmo dia**, ligar o "cutucão" (o plano grátis pausa o projeto depois de 7 dias sem uso): GitHub → repositório → **Settings → Secrets and variables → Actions** → criar `SUPABASE_URL` (a Project URL) e `SUPABASE_ANON_KEY` (a chave pública). Antes, mover `supabase/automacao/manter-supabase-acordado.yml` pra `.github/workflows/` na `main` (o push pede a permissão `workflow`: rodar `gh auth refresh -s workflow` e aceitar no navegador). Testar em **Actions → Manter Supabase acordado → Run workflow**: tem que aparecer `Resposta do banco: "ok"`. Se um dia falhar, o GitHub manda e-mail.
 8. Testar no PC: na pasta `prototipo`, rodar `python -m http.server 8000` e abrir `http://localhost:8000`.
 
+## Testar no computador (sem Supabase)
+
+Serve pra conferir as regras antes de mandar pro Supabase. Usa um PostgreSQL de teste que é apagado depois; nada vai pra internet.
+
+1. Baixar o PostgreSQL portátil (não precisa instalar):
+   `pip download pgserver --python-version 3.12 --platform win_amd64 --only-binary=:all: --no-deps`
+   e descompactar o `.whl` (é um zip). Os programas ficam em `pgserver/pginstall/bin`.
+2. Criar e ligar o banco de teste (deixa o terminal aberto):
+   `initdb -D pasta-do-teste -U postgres -A trust -E UTF8 --locale=C` e
+   `pg_ctl -D pasta-do-teste -o "-p 54329" start`
+3. Na pasta `prototipo`: `bash supabase/teste-local/rodar-testes.sh "<caminho>/pgserver/pginstall/bin" 54329`
+   Tem que terminar com `RESULTADO: tudo passou.`
+
 ## Antes de entrar aluno de verdade
 
 - [ ] Repositório do GitHub **privado** (hoje é público).
 - [ ] Testes rodados no projeto real (passo 3).
 - [ ] E-mail próprio pra mandar os links (Authentication → SMTP; ex.: Resend). O e-mail grátis do Supabase manda poucos por hora.
-- [ ] Termo de uso dos dados (LGPD) no primeiro acesso: o app guarda dados de saúde (lesões, peso, fotos).
+- [ ] Termo de uso dos dados (LGPD): quem entra pelo cadastro já aceita (fica gravado em `cadastros.termo_aceito_em`). Falta pro aluno que entra por convite do Jorge.
 - [ ] Plano Pro (~US$ 25/mês) quando tiver aluno pagante, por causa do backup diário.
 
 ## O que ficou de fora (de propósito, por enquanto)
 
 - **Biblioteca de exercícios e modelos de treino** continuam no `dados.js`. Só os exercícios que o Jorge cria vão pro banco.
 - **Aluno sem treino montado** vê o modelo "Hipertrofia ABC" até o Jorge montar o dele.
-- **Cadastro no app**: o banco já está pronto, mas o `banco.js` ainda não manda o pedido nem chama aprovar/recusar. As telas existem só no modo demonstração.
-- **Avaliações, chat e comprovantes de Pix** (rodadas 3 e 4 do protótipo): ainda não têm tabela no banco.
+- **O app ainda não usa as partes novas do banco.** Cadastro, avaliação, chat, comprovante, planos, alimentação, avisos e exclusão já estão prontos e testados no banco, mas o `banco.js` só fala com as tabelas do esquema original. As telas novas funcionam só no modo demonstração.
+- **Check-in e hábitos** saíram do protótipo na rodada 2, mas as tabelas continuam no banco (não atrapalham; dá pra usar de novo se o Jorge quiser).
+- **Avisos no celular**: o banco guarda o que cada aluno escolheu, mas mandar a notificação de verdade precisa de um serviço de push (fica pra depois).
 - **Fotos** sobem pro banco, mas a fila sem internet não vale pra elas (arquivo grande).

@@ -1,6 +1,6 @@
 /* Guarda o app no celular pra abrir sem internet (academia com sinal ruim).
    Ao publicar uma versão nova, sobe o número de VERSAO: o celular baixa tudo de novo. */
-const VERSAO = "jorge-v3";
+const VERSAO = "jorge-v9";
 const ARQUIVOS = ["./", "index.html", "app.css", "config.js", "banco.js", "dados.js", "app.js", "manifest.webmanifest",
   "icones/icone-180.png", "icones/icone-192.png", "icones/icone-512.png"];
 

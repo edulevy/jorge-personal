@@ -17,3 +17,5 @@ Protótipo do app de consultoria online do Jorge (personal trainer), pra apresen
 | Conversa com o banco | `banco.js` |
 | Tabelas e proteção | `supabase/` |
 | Publicar versão nova no celular | subir `VERSAO` no `sw.js` |
+
+**Questionário pro Jorge:** `questionario/` (https://edulevy.github.io/jorge-personal/questionario/). Ele toca nas opções e envia pelo WhatsApp; nada fica salvo no site, só no celular dele até enviar.

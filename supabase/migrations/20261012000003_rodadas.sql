@@ -2,7 +2,7 @@
 -- O que o protótipo ganhou nas rodadas 1 a 5 e ainda não existia no banco.
 -- Roda depois do esquema, do cadastro e do ping.
 --
---   1. ficha do aluno: suspender acesso, plano, troca quinzenal, altura
+--   1. ficha do aluno: suspender acesso, plano, troca quinzenal
 --   2. plano série a série (formato do treino)
 --   3. avaliação física (só o Jorge vê) + fotos da avaliação
 --   4. chat no app
@@ -20,8 +20,7 @@
 alter table public.alunos
   add column suspenso_em date,                              -- preenchido = acesso pausado (falta de pagamento)
   add column plano       text not null default 'mensal',
-  add column troca_em    date,                              -- próxima troca de treino (quinzenal)
-  add column altura      numeric(4,2);                      -- em metros
+  add column troca_em    date;                              -- próxima troca de treino (quinzenal)
 
 -- aluno liberado = é o aluno, está ativo e não está suspenso.
 -- Suspenso: continua vendo a ficha, os pagamentos e o chat, e consegue mandar comprovante,
@@ -72,7 +71,7 @@ create table public.avaliacoes (
   aluno_id  uuid not null references public.alunos(id) on delete cascade,
   data      date not null default current_date,
   peso      numeric(5,1),
-  altura    numeric(4,2),
+  altura    numeric(5,1),                  -- em cm
   circ      jsonb not null default '{}',   -- {"peito":98,"braco":34,"cintura":80,...} em cm
   dobras    jsonb not null default '{}',   -- {"peitoral":8,"triceps":12,...} em mm (7 dobras)
   gordura   numeric(4,1),                  -- % calculado (Jackson & Pollock + Siri)

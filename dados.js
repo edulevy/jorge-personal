@@ -12,6 +12,16 @@ const MARCA = {
   pix: "jorge.personal@pix.com.br" // chave fictícia
 };
 
+/* opções de marca pro Jorge escolher (nome, iniciais e cor). Antes de fechar: conferir nome no INPI e domínio no registro.br */
+const MARCAS = [
+  {id:"bunn", nome:"Bunn Performance", iniciais:"BP", slogan:"Treino individual, de perto, de onde você estiver", dominio:"app.bunnperformance.com.br",
+   claro:{accent:"#d9480f", ink:"#ffffff", soft:"#fde8dc"}, escuro:{accent:"#ff6a2b", ink:"#1b0b03", soft:"#3a1d10"}, cor:"Laranja"},
+  {id:"jb", nome:"JB Coach", iniciais:"JB", slogan:"Consultoria de treino com o Jorge Bunn", dominio:"app.jbcoach.com.br",
+   claro:{accent:"#1d4ed8", ink:"#ffffff", soft:"#dfe7fb"}, escuro:{accent:"#5b8cff", ink:"#050c1f", soft:"#16213d"}, cor:"Azul"},
+  {id:"metodo", nome:"Método Bunn", iniciais:"MB", slogan:"Seu treino, sua evolução, do jeito certo", dominio:"app.metodobunn.com.br",
+   claro:{accent:"#a16207", ink:"#ffffff", soft:"#fbf0d4"}, escuro:{accent:"#facc15", ink:"#1d1600", soft:"#3a3010"}, cor:"Dourado"}
+];
+
 /* local: onde dá pra fazer · alt: trocas quando o aparelho está ocupado */
 const EX = {
   supino_reto:        {nome:"Supino reto com barra", grupo:"Peito", local:"academia", dica:"Escápulas encaixadas no banco, pés firmes. Desce a barra até o meio do peito, sem quicar.", alt:["supino_halter","supino_maquina","flexao"]},
@@ -76,35 +86,60 @@ const EX = {
 
   prancha:            {nome:"Prancha", grupo:"Core", local:"casa", dica:"Glúteo contraído, não deixa o quadril cair.", alt:["dead_bug"]},
   dead_bug:           {nome:"Dead bug", grupo:"Core", local:"casa", dica:"Lombar colada no chão enquanto estica braço e perna opostos.", alt:["prancha"]},
-  abd_infra:          {nome:"Abdominal infra", grupo:"Core", local:"casa", dica:"Sobe o quadril do chão, sem embalo.", alt:["dead_bug"]}
+  abd_infra:          {nome:"Abdominal infra", grupo:"Core", local:"casa", dica:"Sobe o quadril do chão, sem embalo.", alt:["dead_bug"]},
+
+  rodagem:            {nome:"Corrida contínua (rodagem)", grupo:"Corrida", local:"livre", dica:"Ritmo confortável: dá pra falar frases curtas.", alt:["esteira_corrida"]},
+  intervalado:        {nome:"Corrida intervalada", grupo:"Corrida", local:"livre", dica:"No forte, ritmo de prova de 5 km. No leve, trote bem solto.", alt:["tiros"]},
+  longao:             {nome:"Longão", grupo:"Corrida", local:"livre", dica:"Devagar e constante. O objetivo é tempo em pé, não velocidade.", alt:["rodagem"]},
+  esteira_corrida:    {nome:"Corrida na esteira", grupo:"Corrida", local:"academia", dica:"Inclinação 1% pra imitar a rua.", alt:["rodagem"]},
+
+  mob_quadril:        {nome:"Mobilidade de quadril 90/90", grupo:"Mobilidade", local:"casa", dica:"Sentado no chão, joelhos a 90°. Gira o quadril de um lado pro outro sem usar as mãos.", alt:["alonga_flexor"]},
+  mob_toracica:       {nome:"Rotação torácica no chão", grupo:"Mobilidade", local:"casa", dica:"Deitado de lado, joelhos dobrados. Abre o braço de cima acompanhando com o olhar.", alt:["gato_vaca"]},
+  gato_vaca:          {nome:"Gato e vaca", grupo:"Mobilidade", local:"casa", dica:"De quatro apoios, arredonda e estende a coluna devagar, com a respiração.", alt:["mob_toracica"]},
+  mob_tornozelo:      {nome:"Mobilidade de tornozelo na parede", grupo:"Mobilidade", local:"casa", dica:"Joelho vai em direção à parede sem tirar o calcanhar do chão.", alt:["mob_quadril"]},
+  alonga_flexor:      {nome:"Alongamento de flexor do quadril", grupo:"Mobilidade", local:"casa", dica:"Joelho de trás no chão, contrai o glúteo e leva o quadril à frente.", alt:["mob_quadril"]},
+  alonga_posterior:   {nome:"Alongamento de posterior de coxa", grupo:"Mobilidade", local:"casa", dica:"Perna estendida no apoio, inclina o tronco com a coluna reta.", alt:["alonga_flexor"]}
 };
 
-/* exercício do treino: [id, séries, reps, descanso (s), carga sugerida (kg) ou null, observação] */
-const e = (id, series, reps, desc, carga, obs) => ({id, series, reps, desc, carga: carga ?? null, obs: obs || ""});
+/* métodos (intensificação). Bi-set/tri-set é o botão 🔗 "junta com o próximo" no editor */
+const METODOS = ["Normal","Drop-set","Rest-pause","Pirâmide","Cluster","FST-7","Isometria","Parciais","Negativa"];
+
+/* exercício do treino: [id, séries, reps, descanso (s), carga sugerida (kg) ou null, observação, extra]
+   extra: cad (cadência: descida-pausa-subida-pausa), int (RIR/RPE, ou zona/ritmo no cardio), met (método), jun (junta com o próximo: bi-set),
+   plano (carga e reps de cada série: [{reps, kg}]; sem plano, todas as séries iguais) */
+const e = (id, series, reps, desc, carga, obs, x) => Object.assign({id, series, reps, desc, carga: carga ?? null, plano:null, obs: obs || "", cad:"", int:"", met:"Normal", jun:false}, x || {});
 
 const T_MARINA = [
   {letra:"A", nome:"Inferior · quadríceps", local:"academia", exs:[
-    e("agachamento",4,"8–10",90,40,"Aquecimento: 2 séries leves antes."),
-    e("leg_press",3,"12",90,120),
-    e("afundo",3,"10 cada",75,10,"Carga em cada mão."),
-    e("extensora",3,"12–15",60,35),
-    e("panturrilha",4,"15",45,30),
+    e("agachamento",4,"10",90,35,"Aquecimento: 2 séries leves antes. Sobe a carga a cada série.",{cad:"3-1-1-0", int:"RIR 2", met:"Pirâmide",
+      plano:[{reps:"10", kg:35},{reps:"8", kg:40},{reps:"8", kg:40},{reps:"6", kg:42.5}]}),
+    e("leg_press",3,"12",90,120,"",{cad:"3-0-1-0", int:"RIR 2"}),
+    e("afundo",3,"10 cada",75,10,"Carga em cada mão.",{int:"RIR 2"}),
+    e("extensora",3,"12–15",60,35,"Na última série: tira 30% da carga e vai até a falha.",{cad:"2-0-1-1", int:"RIR 1", met:"Drop-set"}),
+    e("panturrilha",4,"15",45,30,"",{cad:"2-2-1-1", int:"RIR 1"}),
     e("prancha",3,"40s",45,null)]},
   {letra:"B", nome:"Superior · peito, costas e braços", local:"academia", exs:[
-    e("supino_inclinado",4,"10",90,14,"Carga em cada mão."),
-    e("puxada_frente",4,"10",90,40),
-    e("remada_baixa",3,"12",75,35),
-    e("elevacao_lateral",3,"15",45,6,"Ombro direito: para se doer. Se doer, troca pela polia."),
-    e("face_pull",3,"15",45,15),
-    e("triceps_corda",3,"12",45,20),
-    e("rosca_direta",3,"12",45,16)]},
+    e("supino_inclinado",4,"10",90,14,"Carga em cada mão.",{cad:"3-0-1-0", int:"RIR 2"}),
+    e("puxada_frente",4,"10",90,40,"",{cad:"2-0-1-1", int:"RIR 2"}),
+    e("remada_baixa",3,"12",75,35,"",{int:"RIR 2"}),
+    e("elevacao_lateral",3,"15",45,6,"Ombro direito: para se doer. Se doer, troca pela polia.",{int:"RIR 1"}),
+    e("face_pull",3,"15",45,15,"",{cad:"2-0-1-2", int:"RIR 2"}),
+    e("triceps_corda",3,"12",0,20,"",{int:"RIR 1", jun:true}),
+    e("rosca_direta",3,"12",60,16,"",{int:"RIR 1"})]},
   {letra:"C", nome:"Inferior · posterior e glúteo", local:"academia", exs:[
-    e("stiff",4,"10",90,14,"Carga em cada mão."),
-    e("elevacao_pelvica",4,"10",90,60),
-    e("mesa_flexora",3,"12",60,30),
-    e("bulgaro",3,"10 cada",75,8),
-    e("abdutora",3,"15",45,45),
-    e("dead_bug",3,"10 cada",45,null)]}
+    e("stiff",4,"10",90,14,"Carga em cada mão.",{cad:"3-1-1-0", int:"RIR 2"}),
+    e("elevacao_pelvica",4,"12",90,50,"",{cad:"2-0-1-2", int:"RIR 1",
+      plano:[{reps:"12", kg:50},{reps:"10", kg:60},{reps:"10", kg:60},{reps:"8", kg:65}]}),
+    e("mesa_flexora",3,"12",60,30,"",{int:"RIR 2"}),
+    e("bulgaro",3,"10 cada",75,8,"",{int:"RIR 2"}),
+    e("abdutora",3,"15",45,45,"Faz 15, descansa 15 segundos e faz mais o que der.",{int:"RIR 0", met:"Rest-pause"}),
+    e("dead_bug",3,"10 cada",45,null)]},
+  {letra:"D", nome:"Corrida e mobilidade", local:"livre", exs:[
+    e("mob_tornozelo",2,"10 cada",0,null,"",{jun:true}),
+    e("mob_quadril",2,"8 cada",30,null),
+    e("rodagem",1,"25 min",0,null,"Se a canela incomodar, troca pela esteira.",{int:"Zona 2 · conversa ok"}),
+    e("alonga_posterior",2,"30s",15,null),
+    e("alonga_flexor",2,"30s cada",15,null)]}
 ];
 
 const T_CASA = {letra:"Casa", nome:"Em casa · sem equipamento", local:"casa", circuito:true, exs:[
@@ -144,29 +179,31 @@ const MODELOS = [
 /* alunos fictícios. ult: dias desde o último treino · sem/meta: treinos na semana · ck: dias desde o último check-in
    venc: dias até o vencimento (negativo = atrasado) · desde: meses de consultoria */
 const A = (id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, extra) =>
-  Object.assign({id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, dor:null, restricao:"", nota:""}, extra||{});
+  Object.assign({id, nome, idade, tipo, objetivo, valor, venc, ult, sem, meta, ck, peso0, peso, modelo, desde, dor:null, restricao:"", nota:"", plano:"mensal",
+    sx: FEM.includes(id) ? "F" : "M"}, extra||{});
+const FEM = ["marina","juliana","camila","fernanda","patricia","aline","beatriz","larissa","vanessa","carla"];
 
 const ALUNOS = [
-  A("marina","Marina Costa",29,"Online","Hipertrofia e definição",250,6,1,2,4,7,66.8,64.9,"hiper_abc",8,
+  A("marina","Marina Costa",29,"Online","Hipertrofia e definição",200,6,1,2,4,7,66.8,64.9,"hiper_abc",8,
     {restricao:"Dor leve no ombro direito (2025). Nada de desenvolvimento atrás da nuca.", nota:"Treina às 6h antes do trabalho. Responde melhor a áudio."}),
-  A("pedro","Pedro Almeida",34,"Presencial","Ganhar massa",800,12,0,3,3,4,72.0,75.4,"hiper_abc",14),
-  A("juliana","Juliana Rocha",41,"Online","Emagrecer 8 kg",250,3,2,2,3,6,84.0,79.1,"fullbody",5,{nota:"Viaja muito a trabalho: usar treino em casa."}),
-  A("rafael","Rafael Souza",27,"Híbrido","Força e performance no jiu-jítsu",450,18,1,3,4,2,81.0,82.2,"hiper_abc",10),
-  A("camila","Camila Ferreira",31,"Online","Glúteo e pernas",250,21,0,4,4,1,58.5,59.8,"hiper_abc",6),
-  A("bruno","Bruno Lima",38,"Online","Emagrecer",250,9,9,0,3,16,98.0,94.6,"fullbody",4,{nota:"Sumiu depois das férias."}),
-  A("fernanda","Fernanda Dias",45,"Presencial","Saúde e postura",800,15,1,2,2,5,63.0,61.7,"iniciante",3,{restricao:"Hérnia de disco L4-L5 controlada. Sem carga axial pesada."}),
+  A("pedro","Pedro Almeida",34,"Presencial","Ganhar massa",200,12,0,3,3,4,72.0,75.4,"hiper_abc",14),
+  A("juliana","Juliana Rocha",41,"Online","Emagrecer 8 kg",200,3,2,2,3,6,84.0,79.1,"fullbody",5,{nota:"Viaja muito a trabalho: usar treino em casa."}),
+  A("rafael","Rafael Souza",27,"Híbrido","Força e performance no jiu-jítsu",200,18,1,3,4,2,81.0,82.2,"hiper_abc",10),
+  A("camila","Camila Ferreira",31,"Online","Glúteo e pernas",200,21,0,4,4,1,58.5,59.8,"hiper_abc",6),
+  A("bruno","Bruno Lima",38,"Online","Emagrecer",200,9,9,0,3,16,98.0,94.6,"fullbody",4,{nota:"Sumiu depois das férias."}),
+  A("fernanda","Fernanda Dias",45,"Presencial","Saúde e postura",200,15,1,2,2,5,63.0,61.7,"iniciante",3,{restricao:"Hérnia de disco L4-L5 controlada. Sem carga axial pesada."}),
   A("lucas","Lucas Martins",22,"Online","Hipertrofia",200,25,6,0,4,9,68.0,70.5,"hiper_abc",7,{nota:"Época de prova na faculdade."}),
-  A("patricia","Patrícia Gomes",52,"Online","Emagrecer e ganhar disposição",250,1,1,3,3,3,79.5,74.0,"fullbody",9),
-  A("thiago","Thiago Ribeiro",30,"Online","Hipertrofia",250,-3,2,2,4,6,77.0,79.0,"hiper_abc",11),
-  A("aline","Aline Barbosa",36,"Híbrido","Voltar a treinar depois da gestação",450,2,0,3,3,1,70.0,67.2,"iniciante",2,{restricao:"Pós-parto (8 meses). Liberada pela médica; cuidado com diástase."}),
-  A("gustavo","Gustavo Pereira",43,"Online","Emagrecer e baixar a pressão",250,14,3,1,3,8,104.0,99.3,"fullbody",6,{restricao:"Hipertenso, toma remédio. Evitar apneia (prender a respiração)."}),
-  A("beatriz","Beatriz Cardoso",25,"Online","Definição pro casamento",250,28,0,4,5,2,61.0,58.6,"hiper_abc",4,{nota:"Casamento em março."}),
-  A("diego","Diego Nunes",33,"Online","Hipertrofia",250,11,2,2,4,1,74.0,76.1,"hiper_abc",8,{dor:"Lombar travou no levantamento terra."}),
+  A("patricia","Patrícia Gomes",52,"Online","Emagrecer e ganhar disposição",200,1,1,3,3,3,79.5,74.0,"fullbody",9),
+  A("thiago","Thiago Ribeiro",30,"Online","Hipertrofia",200,-3,2,2,4,6,77.0,79.0,"hiper_abc",11),
+  A("aline","Aline Barbosa",36,"Híbrido","Voltar a treinar depois da gestação",200,2,0,3,3,1,70.0,67.2,"iniciante",2,{restricao:"Pós-parto (8 meses). Liberada pela médica; cuidado com diástase."}),
+  A("gustavo","Gustavo Pereira",43,"Online","Emagrecer e baixar a pressão",200,14,3,1,3,8,104.0,99.3,"fullbody",6,{restricao:"Hipertenso, toma remédio. Evitar apneia (prender a respiração)."}),
+  A("beatriz","Beatriz Cardoso",25,"Online","Definição pro casamento",200,28,0,4,5,2,61.0,58.6,"hiper_abc",4,{nota:"Casamento em março."}),
+  A("diego","Diego Nunes",33,"Online","Hipertrofia",200,11,2,2,4,1,74.0,76.1,"hiper_abc",8,{dor:"Lombar travou no levantamento terra."}),
   A("larissa","Larissa Teixeira",28,"Online","Condicionamento",200,19,4,1,3,15,64.0,63.2,"fullbody",3),
-  A("ricardo","Ricardo Moura",47,"Presencial","Saúde e força",800,-1,12,0,2,20,88.0,86.5,"iniciante",12,{nota:"Cirurgia no joelho em agosto; liberado pelo ortopedista."}),
-  A("vanessa","Vanessa Pinto",39,"Online","Emagrecer",250,7,1,3,4,4,76.0,71.8,"fullbody",7),
-  A("andre","André Castro",29,"Online","Hipertrofia",250,23,2,3,5,5,80.0,83.4,"hiper_abc",15),
-  A("carla","Carla Mendes",57,"Presencial","Osteopenia: fortalecer ossos",800,5,1,2,2,3,60.0,60.4,"iniciante",9,{restricao:"Osteopenia. Priorizar força com carga progressiva e equilíbrio."}),
+  A("ricardo","Ricardo Moura",47,"Presencial","Saúde e força",200,-1,12,0,2,20,88.0,86.5,"iniciante",12,{nota:"Cirurgia no joelho em agosto; liberado pelo ortopedista."}),
+  A("vanessa","Vanessa Pinto",39,"Online","Emagrecer",200,7,1,3,4,4,76.0,71.8,"fullbody",7),
+  A("andre","André Castro",29,"Online","Hipertrofia",200,23,2,3,5,5,80.0,83.4,"hiper_abc",15),
+  A("carla","Carla Mendes",57,"Presencial","Osteopenia: fortalecer ossos",200,5,1,2,2,3,60.0,60.4,"iniciante",9,{restricao:"Osteopenia. Priorizar força com carga progressiva e equilíbrio."}),
   A("felipe","Felipe Araújo",24,"Online","Hipertrofia",200,16,5,1,4,10,66.0,68.9,"hiper_abc",2,{dor:"Dor no punho no supino."})
 ];
 
@@ -178,14 +215,56 @@ const HABITOS = [
   {id:"sono", nome:"Sono", meta:"7 h", icone:"🌙"}
 ];
 
+/* planos: mensal ativo; trimestral e semestral prontos pra ligar quando o Jorge quiser (recorrência) */
+const PLANOS = [
+  {id:"mensal", nome:"Mensal", meses:1, valor:200, ativo:true},
+  {id:"trimestral", nome:"Trimestral", meses:3, valor:540, ativo:false},
+  {id:"semestral", nome:"Semestral", meses:6, valor:1020, ativo:false}
+];
+
+/* PAR-Q (questionário de prontidão pra atividade física). Algum "sim" = pedir liberação médica */
+const PARQ = [
+  "Algum médico já disse que você tem problema de coração e só deve fazer atividade física recomendada por ele?",
+  "Você sente dor no peito quando faz atividade física?",
+  "No último mês, você sentiu dor no peito sem estar fazendo atividade física?",
+  "Você perde o equilíbrio por tontura ou já desmaiou alguma vez?",
+  "Você tem algum problema nos ossos ou nas articulações que pode piorar com atividade física?",
+  "Você toma remédio pra pressão ou pro coração?",
+  "Existe algum outro motivo pelo qual você não deveria fazer atividade física?"
+];
+
+/* termo de consentimento (LGPD). Texto de exemplo: o definitivo passa por um advogado */
+const TERMO = [
+  "Autorizo o Jorge a guardar e usar meus dados (cadastro, anamnese, avaliações, fotos e treinos) só pra montar e acompanhar meu treino.",
+  "Meus dados de saúde e fotos são vistos só pelo Jorge. Não são vendidos nem passados pra ninguém.",
+  "Os dados ficam guardados enquanto eu for aluno e depois disso, até eu pedir pra apagar. Posso pedir pra ver, corrigir ou apagar tudo a qualquer momento, pelo próprio app.",
+  "Entendo que a consultoria não substitui acompanhamento médico, e que devo avisar o Jorge sobre qualquer dor, lesão ou mudança de saúde."
+];
+
+/* cadastro de exemplo esperando aprovação do Jorge */
+const PENDENTES = [
+  {id:"rodrigo", nome:"Rodrigo Alves", idade:26, sx:"M", tipo:"Online", objetivo:"Hipertrofia", whats:"(21) 9xxxx-xxxx", email:"rodrigo@exemplo.com",
+   parq:[0,0,0,0,1,0,0], lesoes:"Torci o tornozelo direito jogando bola em 2024.", remedios:"Nenhum", rotina:"Treino há 1 ano por conta própria, 4x na semana.",
+   dias:"Seg, ter, qui e sex à noite", diasAtras:1}
+];
+
+/* orientações gerais de alimentação do Jorge (dieta individual é com o nutricionista parceiro) */
+const ORIENT = [
+  "Proteína em todas as refeições (carne, frango, peixe, ovo ou laticínio)",
+  "Uns 2,5 litros de água por dia",
+  "Prato com metade de legumes e verduras",
+  "Refeição com carboidrato 1 a 2 horas antes do treino",
+  "Dormir 7 horas ou mais: é quando o músculo se recupera"
+].join("\n");
+
 const RECADO = "Semana de subir carga no agachamento! Se as 4 séries saírem limpas, sobe 2,5 kg na próxima. Qualquer dor no ombro, me avisa antes de continuar.";
 
 /* dores do mercado (base da tela "Por que um app só seu") */
 const DORES = [
   {dor:"O aluno abre o app e vê a marca dos outros", porque:"Nos apps de plataforma (MFIT, Tecnofit, Trainerize…), o aluno baixa o app da plataforma. Ter app com a marca do próprio personal costuma ser um plano à parte, mais caro.", aqui:"Nome, cor e ícone do Jorge na tela do celular do aluno."},
   {dor:"Esquece a carga da última vez", porque:"Sem histórico à mão, o aluno repete carga, perde progressão e anota no bloco de notas ou nem anota.", aqui:"Cada série já vem preenchida com a carga da última vez, e o app comemora o recorde."},
-  {dor:"Check-in no Google Forms ou no WhatsApp", porque:"Nos fóruns do Trainerize, coaches pedem há anos um check-in dentro do app; muitos usam formulário externo e o aluno esquece o dia.", aqui:"Check-in semanal no próprio app, com lembrete, e a resposta do Jorge volta pra lá."},
-  {dor:"O personal só percebe que o aluno sumiu quando ele cancela", porque:"Com 20 alunos no WhatsApp, quem para de treinar desaparece da conversa sem ninguém notar.", aqui:"O painel avisa quem está há 5 dias sem treinar, com check-in atrasado ou com dor, e já tem a mensagem pronta."},
+  {dor:"Montar treino de um em um, toda quinzena", porque:"Nos apps genéricos e no WhatsApp, o personal reescreve o treino de cada aluno do zero a cada troca. Com 20 alunos e troca quinzenal, são 40 treinos por mês.", aqui:"Botão “Próxima quinzena”: copia o treino com a progressão (mais repetição, mais carga ou mais série) e o Jorge só ajusta. Modelo aplicado a vários alunos de uma vez."},
+  {dor:"O personal só percebe que o aluno sumiu quando ele cancela", porque:"Com 20 alunos no WhatsApp, quem para de treinar desaparece da conversa sem ninguém notar.", aqui:"O painel avisa quem está há 5 dias sem treinar, com dor ou com reavaliação vencida, e já tem a mensagem pronta."},
   {dor:"Cobrança na mão e no constrangimento", porque:"Planilha, lembrete no celular, mensagem de cobrança escrita do zero todo mês.", aqui:"Lista de vencimentos e cobrança com Pix em um toque, num tom educado."},
   {dor:"Aparelho ocupado, academia lotada", porque:"O aluno improvisa a troca e às vezes troca por algo que nem trabalha o mesmo músculo.", aqui:"Botão “Trocar” com as substituições que o próprio Jorge aprovou."},
   {dor:"Não deu pra ir à academia, o treino foi pro lixo", porque:"Viagem, chuva, filho doente: o treino da academia não serve, e a semana se perde.", aqui:"Plano B pronto: treino em casa sem equipamento e treino ao ar livre."},
@@ -193,5 +272,5 @@ const DORES = [
   {dor:"Paga por aluno, todo mês", porque:"Plataformas cobram mensalidade que cresce com o número de alunos, e os dados ficam nelas.", aqui:"Custo fixo de infraestrutura, e os dados dos alunos são do Jorge."}
 ];
 
-return {MARCA, EX, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
+return {MARCA, MARCAS, EX, METODOS, ORIENT, PLANOS, PARQ, TERMO, PENDENTES, T_MARINA, T_CASA, T_LIVRE, MODELOS, ALUNOS, HABITOS, RECADO, DORES};
 })();

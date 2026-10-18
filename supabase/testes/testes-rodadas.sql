@@ -37,7 +37,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111"}', true);
 do $$ declare n int; begin
   insert into public.avaliacoes (aluno_id, peso, altura, dobras, gordura, fotos) values
-    ('b0000000-0000-0000-0000-000000000001', 64.9, 1.65, '{"triceps":14,"abdominal":18}', 22.4, '{"frente":"b0000000-0000-0000-0000-000000000001/av1/frente.jpg"}');
+    ('b0000000-0000-0000-0000-000000000001', 64.9, 165, '{"triceps":14,"abdominal":18}', 22.4, '{"frente":"b0000000-0000-0000-0000-000000000001/av1/frente.jpg"}');
   insert into storage.objects (bucket_id, name) values ('avaliacoes', 'b0000000-0000-0000-0000-000000000001/av1/frente.jpg');
   raise notice 'OK  Jorge: registra avaliação com dobras, %% de gordura e foto';
   begin

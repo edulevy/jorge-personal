@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Questionário do app</title>
+<meta name="theme-color" content="#d9480f">
+<style>
+:root{
+  --bg:#f3f2ee; --surface:#fff; --sunk:#ebe9e3; --ink:#16181b; --muted:#5f646b; --line:#dddbd3;
+  --accent:#d9480f; --accent-ink:#fff; --accent-soft:#fde8dc; --ok:#1d7f48; --ok-soft:#dcf2e4;
+  --f-body:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  --f-data:ui-monospace,"SF Mono",Consolas,monospace; --r:14px; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e0f11; --surface:#17191c; --sunk:#202328; --ink:#eeece8; --muted:#9ba1a8; --line:#2a2e34;
+  --accent:#ff6a2b; --accent-ink:#1b0b03; --accent-soft:#3a1d10; --ok:#3fc47a; --ok-soft:#14301f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e0f11; --surface:#17191c; --sunk:#202328; --ink:#eeece8; --muted:#9ba1a8; --line:#2a2e34;
+  --accent:#ff6a2b; --accent-ink:#1b0b03; --accent-soft:#3a1d10; --ok:#3fc47a; --ok-soft:#14301f; color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 var(--f-body);-webkit-tap-highlight-color:transparent}
+h1,h2,h3{margin:0;line-height:1.15;text-wrap:balance}
+p{margin:0}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 24px) 16px 120px}
+.eyebrow{font-family:var(--f-data);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+header h1{font-size:1.7rem;margin:6px 0 10px}
+header p{color:var(--muted)}
+.dica{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;font-size:.92rem}
+.dica b{color:var(--accent)}
+.campo-nome{margin-top:16px}
+label.rot{display:block;font-weight:600;margin-bottom:6px}
+input[type=text],textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:11px 12px;font-size:16px}
+textarea{min-height:76px;resize:vertical}
+.bloco{margin-top:30px}
+.bloco-tit{display:flex;align-items:baseline;gap:10px;padding-bottom:8px;border-bottom:2px solid var(--accent)}
+.bloco-tit .n{font-family:var(--f-data);color:var(--accent);font-weight:700}
+.bloco-tit h2{font-size:1.15rem}
+.bloco-nota{font-size:.85rem;color:var(--muted);margin-top:8px}
+.q{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-top:12px}
+.q.feita{border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
+.q h3{font-size:1rem;font-weight:600}
+.q h3 .num{font-family:var(--f-data);color:var(--muted);font-weight:400;margin-right:4px}
+.q .ajuda{font-size:.84rem;color:var(--muted);margin-top:4px}
+.q .tipo{font-size:.76rem;color:var(--muted);margin-top:6px}
+.opcoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.op{border:1.5px solid var(--line);background:var(--sunk);border-radius:999px;padding:9px 14px;font-size:.95rem;cursor:pointer;min-height:42px;text-align:left}
+.op[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.op[aria-pressed="true"]::before{content:"✓ "}
+.extra{margin-top:10px}
+.extra input{font-size:15px}
+.q textarea{margin-top:10px}
+.barra{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px 16px calc(env(safe-area-inset-bottom) + 10px);z-index:5}
+.barra-in{max-width:560px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.prog{flex:1;min-width:0}
+.prog .txt{font-size:.8rem;color:var(--muted)}
+.trilho{height:6px;background:var(--sunk);border-radius:99px;overflow:hidden;margin-top:4px}
+.trilho i{display:block;height:100%;width:0;background:var(--ok);transition:width .25s}
+.btn{border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-s{background:var(--sunk);border:1px solid var(--line)}
+.fim{margin-top:30px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.fim h2{font-size:1.15rem;margin-bottom:6px}
+.fim p{color:var(--muted);font-size:.92rem}
+.fim .acoes{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.fim .acoes .btn{flex:1 1 200px}
+.aviso{font-size:.85rem;color:var(--ok);margin-top:10px;min-height:1.2em}
+.limpar{background:none;border:0;color:var(--muted);text-decoration:underline;font-size:.85rem;margin-top:14px;cursor:pointer;padding:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">App de consultoria online</div>
+    <h1>Como você trabalha hoje</h1>
+    <p>Com essas respostas eu monto o app do jeito que você trabalha. A maioria é só tocar na opção. Leva uns 10 minutos.</p>
+    <div class="dica">Pode pular o que não souber. As perguntas com <b>●</b> são as que mais pesam. O que você marca fica salvo neste celular, então dá pra parar e continuar depois. No fim, toque em <b>Enviar pelo WhatsApp</b>.</div>
+    <div class="campo-nome">
+      <label class="rot" for="nome">Seu nome</label>
+      <input type="text" id="nome" autocomplete="name" placeholder="Ex.: Jorge">
+    </div>
+  </header>
+  <main id="form"></main>
+  <section class="fim" id="fim">
+    <h2>Pronto, é só mandar</h2>
+    <p>O botão abre o WhatsApp com as respostas já escritas: escolha a conversa comigo e envie. Se não abrir, copie e cole na conversa.</p>
+    <div class="acoes">
+      <button class="btn btn-p" id="enviar" type="button">Enviar pelo WhatsApp</button>
+      <button class="btn btn-s" id="copiar" type="button">Copiar respostas</button>
+    </div>
+    <div class="aviso" id="aviso" role="status"></div>
+    <button class="limpar" id="limpar" type="button">Apagar tudo e começar de novo</button>
+  </section>
+</div>
+<div class="barra"><div class="barra-in">
+  <div class="prog"><div class="txt" id="prog-txt">0 de 0 respondidas</div><div class="trilho"><i id="prog-bar"></i></div></div>
+  <button class="btn btn-p" type="button" id="ir-fim">Enviar</button>
+</div></div>
+
+<script>
+/* Tipos: um = escolhe uma (toca de novo pra desmarcar) · varias = pode marcar várias · texto = escreve.
+   Opção terminada em "…" abre um campinho pra escrever (ex.: "Outro…"). */
+const BLOCOS = [
+  {t:"O negócio hoje", q:[
+    {p:"Por onde passa hoje o treino, a cobrança e o acompanhamento dos alunos?", tipo:"varias", imp:1,
+     o:["WhatsApp","Planilha / PDF","Presencial","Instagram / Direct","Outro app…","Outro…"]},
+    {p:"Já usou algum app de treino (MFIT, Tecnofit, Trainerize…)? O que gostava e o que odiava?", tipo:"texto", imp:1},
+    {p:"Qual a maior dor hoje? O que mais toma seu tempo ou faz você perder aluno?", tipo:"texto", imp:1},
+    {p:"Quantos alunos você tem hoje e quantos quer ter daqui a 12 meses?", tipo:"texto", imp:1, ph:"Ex.: hoje 25, quero 60"},
+    {p:"Você trabalha sozinho ou mais alguém vai precisar entrar no painel?", tipo:"varias", imp:1,
+     o:["Sozinho","Outros personais","Nutricionista","Estagiário / assistente"]},
+  ]},
+  {t:"Os alunos", q:[
+    {p:"Como seus alunos se viram com tecnologia?", tipo:"um", o:["Maioria jovem, usa app tranquilo","Misto","Maioria com pouca familiaridade"]},
+    {p:"Qual celular a maioria usa?", tipo:"um", o:["Maioria iPhone","Maioria Android","Meio a meio"],
+     a:"No iPhone o aviso no celular só funciona com o app instalado na tela inicial."},
+    {p:"Seus alunos são online, presenciais ou os dois?", tipo:"um", o:["Só online","Só presencial","Os dois"]},
+    {p:"Como o aluno deve entrar no app?", tipo:"um", imp:1, o:["Eu cadastro e mando convite","Ele se cadastra e eu aprovo","Ele se cadastra ao pagar"]},
+  ]},
+  {t:"Treinos", q:[
+    {p:"Como você organiza os treinos?", tipo:"varias", imp:1, o:["Divisão A/B/C…","Por dia da semana","Periodização em fases/semanas","Varia por aluno"]},
+    {p:"O que cada exercício precisa mostrar?", tipo:"varias", imp:1,
+     o:["Séries","Repetições","Carga","Descanso","Cadência","RPE / RIR","Método (bi-set, drop-set…)","Observação","Outro…"]},
+    {p:"Vai ter vídeo ou demonstração dos exercícios?", tipo:"varias", imp:1, o:["Vídeos meus","Links do YouTube","GIFs / imagens","Não precisa"]},
+    {p:"Mais ou menos quantos exercícios diferentes você usa?", tipo:"um", o:["Até 100","100 a 300","Mais de 300"]},
+    {p:"O aluno deve registrar o que fez no treino?", tipo:"varias", imp:1,
+     o:["Só marcar como feito","Registrar carga e repetições","Dar feedback (dor, esforço)","Não precisa"]},
+    {p:"De quanto em quanto tempo você troca o treino?", tipo:"um", o:["Semanal","Quinzenal","Mensal","Por fase (6 a 8 semanas)"]},
+    {p:"Quer criar modelos de treino e reaproveitar pra vários alunos?", tipo:"um", o:["Sim","Não"]},
+    {p:"O treino precisa abrir sem internet na academia?", tipo:"um", o:["Sim","Não","Não sei"]},
+    {p:"Além de musculação, o que mais entra no plano?", tipo:"varias", o:["Cardio / aeróbico","Mobilidade / alongamento","Treino em casa","Corrida","Outro…"]},
+  ]},
+  {t:"Avaliação e acompanhamento", q:[
+    {p:"O que você mede na avaliação física?", tipo:"varias", imp:1,
+     o:["Peso","Circunferências","Dobras cutâneas","Bioimpedância","Fotos (frente/lado/costas)","Testes de força","Anamnese / PAR-Q","Outro…"]},
+    {p:"Com que frequência você reavalia?", tipo:"um", o:["Mensal","Bimestral","Trimestral","Sem regra"]},
+    {p:"Quer que o aluno faça um check-in (sono, energia, dor, se seguiu o plano)?", tipo:"um", o:["Semanal","Quinzenal","Não precisa"]},
+    {p:"O aluno deve ver gráficos da própria evolução?", tipo:"um", o:["Sim","Não","Só eu vejo"]},
+  ]},
+  {t:"Nutrição", q:[
+    {p:"Você passa orientação alimentar?", tipo:"varias", imp:1,
+     o:["Não","Orientações gerais","Plano feito por nutricionista parceiro","Anexo em PDF"]},
+  ]},
+  {t:"Comunicação", q:[
+    {p:"Precisa de chat dentro do app ou continua no WhatsApp?", tipo:"um", imp:1,
+     o:["Chat no app","Continua no WhatsApp","Botão no app que abre o WhatsApp"]},
+    {p:"Que avisos o aluno deve receber no celular?", tipo:"varias",
+     o:["Lembrete de treino","Treino novo disponível","Check-in pendente","Vencimento do plano","Mensagem sua","Nenhum"]},
+  ]},
+  {t:"Pagamento e planos", q:[
+    {p:"Como você cobra hoje?", tipo:"varias", imp:1, o:["Pix manual","Cartão recorrente","Link de pagamento","Hotmart / Kiwify / similar","Outro…"]},
+    {p:"Quer que a cobrança seja automática dentro do app?", tipo:"um", imp:1, o:["Sim, já no lançamento","Sim, mas depois","Não"]},
+    {p:"Quais planos e valores você oferece?", tipo:"texto", imp:1, ph:"Ex.: mensal R$ 150, trimestral R$ 400, com avaliação…"},
+    {p:"O que acontece quando o aluno não paga?", tipo:"um", o:["Bloqueia o acesso","Só avisa","Decido caso a caso"]},
+    {p:"Você tem CNPJ / MEI e emite nota fiscal?", tipo:"varias", o:["CNPJ / MEI","Pessoa física","Emito nota","Não emito"]},
+  ]},
+  {t:"Marca e visual", q:[
+    {p:"Já tem nome, logo e cores pro app?", tipo:"varias", imp:1, o:["Tenho logo","Tenho cores definidas","Preciso criar","Nome já definido…"]},
+    {p:"Quer endereço próprio (ex.: app.seunome.com.br)?", tipo:"um", o:["Sim","Não","Já tenho domínio…"], a:"Custa uns R$ 40 por ano."},
+    {p:"Tem algum app ou perfil que você acha bonito e quer de referência?", tipo:"texto"},
+  ]},
+  {t:"Dados e privacidade", nota:"Fotos do corpo, peso e lesões são dados sensíveis pela LGPD, então o app precisa de regras claras.", q:[
+    {p:"Quem pode ver os dados dos alunos?", tipo:"um", imp:1, o:["Só eu","Eu e minha equipe","Cada profissional vê só os seus alunos"]},
+    {p:"Quando o aluno sai, por quanto tempo os dados ficam guardados?", tipo:"um", o:["Apagar na hora","6 meses","1 ano","Até ele pedir pra apagar"]},
+    {p:"Já tem contrato ou termo de consentimento com os alunos?", tipo:"um", o:["Sim","Não","Quero incluir no cadastro do app"]},
+  ]},
+  {t:"Prioridades, prazo e investimento", q:[
+    {p:"Se o app lançasse com só 3 funções, quais seriam?", tipo:"texto", imp:1, a:"É a pergunta mais importante: define o que sai primeiro."},
+    {p:"Pra quando você quer lançar? Tem algum motivo pra essa data?", tipo:"texto", imp:1, ph:"Ex.: janeiro, começo da turma de verão"},
+    {p:"Quanto pretende investir?", tipo:"varias", imp:1, o:["Desenvolvimento: R$…","Mensalidade: R$…","Ainda não sei"],
+     a:"Hospedagem e banco ficam em torno de R$ 150 a 250 por mês."},
+    {p:"Quem vai testar a primeira versão?", tipo:"um", o:["Só eu","3 a 5 alunos piloto","Todos de uma vez"]},
+    {p:"Como prefere acompanhar o projeto?", tipo:"varias", o:["Reunião semanal","Atualizações no WhatsApp","Demonstração a cada entrega"]},
+    {p:"Depois do lançamento, quer suporte e melhorias mensais?", tipo:"um", o:["Sim","Só correção de erros","Não"]},
+    {p:"Quer comentar mais alguma coisa?", tipo:"texto"},
+  ]},
+];
+
+const CHAVE = "questionario-jorge-v1";
+let R = {};                       // respostas: id -> {m:[opções], x:{opção:texto}, t:texto}
+try { R = JSON.parse(localStorage.getItem(CHAVE)) || {}; } catch (e) { R = {}; }
+const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(R)); } catch (e) {} };
+
+const form = document.getElementById("form");
+const todas = [];
+let n = 0;
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+BLOCOS.forEach((b, bi) => {
+  const sec = el("section", "bloco");
+  const tit = el("div", "bloco-tit");
+  tit.append(el("span", "n", String(bi + 1).padStart(2, "0")), el("h2", null, b.t));
+  sec.append(tit);
+  if (b.nota) sec.append(el("p", "bloco-nota", b.nota));
+  b.q.forEach(q => {
+    n++; q.id = "q" + n; q.n = n; q.bloco = b.t; todas.push(q);
+    const r = R[q.id] || (R[q.id] = {m: [], x: {}, t: ""});
+    const card = el("div", "q"); card.id = q.id;
+    const h = el("h3");
+    h.append(el("span", "num", n + "."), document.createTextNode(q.p + (q.imp ? " ●" : "")));
+    card.append(h);
+    if (q.a) card.append(el("p", "ajuda", q.a));
+    if (q.tipo === "texto") {
+      const ta = el("textarea"); ta.placeholder = q.ph || "Escreva aqui"; ta.value = r.t || "";
+      ta.setAttribute("aria-label", q.p);
+      ta.addEventListener("input", () => { r.t = ta.value; salvar(); atualizar(); });
+      card.append(ta);
+    } else {
+      card.append(el("p", "tipo", q.tipo === "varias" ? "Pode marcar várias" : "Escolha uma"));
+      const ops = el("div", "opcoes"), extras = el("div");
+      const desenhar = () => {
+        ops.querySelectorAll(".op").forEach(bt => bt.setAttribute("aria-pressed", r.m.includes(bt.dataset.o)));
+        extras.innerHTML = "";
+        r.m.filter(o => o.endsWith("…")).forEach(o => {
+          const w = el("div", "extra"), inp = el("input");
+          inp.type = "text"; inp.placeholder = o.replace(/…$/, "").replace(/:\s*R\$$/, " (R$)") + ": escreva aqui";
+          inp.value = r.x[o] || ""; inp.setAttribute("aria-label", o);
+          inp.addEventListener("input", () => { r.x[o] = inp.value; salvar(); });
+          w.append(inp); extras.append(w);
+        });
+        card.classList.toggle("feita", r.m.length > 0);
+      };
+      q.o.forEach(o => {
+        const bt = el("button", "op", o); bt.type = "button"; bt.dataset.o = o;
+        bt.addEventListener("click", () => {
+          const tem = r.m.includes(o);
+          if (q.tipo === "um") r.m = tem ? [] : [o];
+          else r.m = tem ? r.m.filter(v => v !== o) : [...r.m, o];
+          salvar(); desenhar(); atualizar();
+        });
+        ops.append(bt);
+      });
+      card.append(ops, extras);
+      desenhar();
+    }
+    sec.append(card);
+  });
+  form.append(sec);
+});
+
+const nome = document.getElementById("nome");
+nome.value = R._nome || "";
+nome.addEventListener("input", () => { R._nome = nome.value; salvar(); });
+
+const respondida = q => { const r = R[q.id]; return q.tipo === "texto" ? !!(r.t || "").trim() : r.m.length > 0; };
+function atualizar() {
+  const k = todas.filter(respondida).length;
+  document.getElementById("prog-txt").textContent = k + " de " + todas.length + " respondidas";
+  document.getElementById("prog-bar").style.width = (100 * k / todas.length) + "%";
+  todas.forEach(q => { if (q.tipo === "texto") document.getElementById(q.id).classList.toggle("feita", respondida(q)); });
+}
+atualizar();
+
+function montarTexto() {
+  const linhas = ["*Questionário do app de consultoria*", "Nome: " + ((R._nome || "").trim() || "(não informado)"), ""];
+  let bloco = "";
+  todas.forEach(q => {
+    if (q.bloco !== bloco) { bloco = q.bloco; linhas.push("*" + bloco + "*"); }
+    const r = R[q.id];
+    let resp;
+    if (q.tipo === "texto") resp = (r.t || "").trim();
+    else resp = r.m.map(o => {
+      const base = o.replace(/…$/, ""), x = (r.x[o] || "").trim();
+      return !x ? base : base + (base.endsWith("R$") ? " " : ": ") + x;
+    }).join("; ");
+    linhas.push(q.n + ". " + q.p, "→ " + (resp || "—"));
+  });
+  return linhas.join("\n");
+}
+
+const aviso = document.getElementById("aviso");
+document.getElementById("ir-fim").addEventListener("click", () => document.getElementById("fim").scrollIntoView({behavior: "smooth"}));
+document.getElementById("enviar").addEventListener("click", () => {
+  window.open("https://wa.me/?text=" + encodeURIComponent(montarTexto()), "_blank");
+});
+document.getElementById("copiar").addEventListener("click", async () => {
+  const txt = montarTexto();
+  try { await navigator.clipboard.writeText(txt); aviso.textContent = "Copiado. Agora é só colar na conversa do WhatsApp."; }
+  catch (e) {
+    const ta = el("textarea"); ta.value = txt; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); aviso.textContent = "Copiado. Agora é só colar na conversa do WhatsApp."; }
+    catch (e2) { aviso.textContent = "Não deu pra copiar automaticamente."; }
+    ta.remove();
+  }
+});
+document.getElementById("limpar").addEventListener("click", () => {
+  if (!confirm("Apagar todas as respostas deste celular?")) return;
+  try { localStorage.removeItem(CHAVE); } catch (e) {}
+  location.reload();
+});
+</script>
+</body>
+</html>

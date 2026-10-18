@@ -84,8 +84,8 @@ O convite feito pelo Jorge continua valendo junto.
 ## Passo a passo pra ligar de verdade
 
 1. Criar conta em supabase.com → **New project**, região **South America (São Paulo)**. Guarde a senha do banco num gerenciador de senhas.
-2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito e **nesta ordem**: `20261012000001_cadastro.sql`, `20261012000002_ping.sql` e `20261012000003_rodadas.sql`.
-3. **SQL Editor** → colar `testes/testes-protecao.sql` → **Run**. Tem que aparecer `TODOS OS TESTES PASSARAM`. Depois `testes/testes-cadastro.sql` → `TODOS OS TESTES DO CADASTRO PASSARAM` e `testes/testes-rodadas.sql` → `TODOS OS TESTES DAS RODADAS PASSARAM`.
+2. **SQL Editor** → colar `migrations/20261010000001_esquema.sql` → **Run**. Depois, do mesmo jeito e **nesta ordem**: `20261012000001_cadastro.sql`, `20261012000002_ping.sql`, `20261012000003_rodadas.sql` e `20261012000004_app.sql`.
+3. **SQL Editor** → colar `testes/testes-protecao.sql` → **Run**. Tem que aparecer `TODOS OS TESTES PASSARAM`. Depois `testes/testes-cadastro.sql` → `TODOS OS TESTES DO CADASTRO PASSARAM`, `testes/testes-rodadas.sql` → `TODOS OS TESTES DAS RODADAS PASSARAM` e `testes/testes-app.sql` → `TODOS OS TESTES DO APP PASSARAM`. Se algum falhar, aparece um erro vermelho começando com `FALHOU:`.
 4. **Authentication → URL Configuration**:
    - em **Site URL**, o endereço do app;
    - em **Redirect URLs**, `http://localhost:8000/**` (pra testar no PC) e o endereço publicado.
